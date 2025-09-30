@@ -1,0 +1,20 @@
+{
+    "name": "bundler-vite",
+    "version": "1.0.0",
+    "description": "Example sbt-jsbundler project with bi-directional JS interop",
+    "type": "module",
+    "license": "MIT",
+    "directories": {
+      "test": "test"
+    },
+    "dependencies": {
+      "@awesome.me/webawesome": "3.0.0-beta.6"
+    },
+    "devDependencies": {
+      "lodash": "^4.17.21",
+      "rollup-plugin-sourcemaps": "^0.6.3",
+      "vite": "^4.5.2",
+      "source-map-support": "^0.5.21",
+      "jsdom": "^24.0.0"
+    }
+  }

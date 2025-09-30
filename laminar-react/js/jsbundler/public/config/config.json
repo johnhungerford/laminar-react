@@ -1,0 +1,10 @@
+{
+    "frontend": {
+        "pageSize": 50,
+        "bufferSize": 5,
+        "apiBaseUrl": "http://localhost:8080"
+    },
+    "shared": {
+        "apiBasePath": "viz"
+    }
+}
