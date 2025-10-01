@@ -1,11 +1,10 @@
 package todo
 
 import com.raquo.laminar.api.L.{*, given}
-import com.raquo.laminar.nodes.ReactiveHtmlElement
-import org.scalajs.dom.{HTMLDivElement, HTMLInputElement, HTMLSelectElement}
-import todo.model.{GlobalEvent, GlobalState, ToDo, ToDoList, ToDoListState}
-import todo.util.StateContainer
-import todo.util.routeSignal
+import org.scalajs.dom.HTMLInputElement
+import todo.model.GlobalEvent
+import util.routeSignal
+import util.StateContainer
 
 
 object AddListComponent:
@@ -21,41 +20,45 @@ object AddListComponent:
         case Initial
         case Adding(nameText: String)
 
-        def reduce(event: Event): State = event match {
+        def reduce(event: Event): State = event match
             case Event.StartAdding => Adding("")
             case Event.StopAdding => Initial
             case Event.SetNameText(value) => Adding(value)
             case Event.Add => Initial
-        }
 
-    def apply(props: Signal[Props]): HtmlElement =
+    def apply(propsSignal: Signal[Props]): HtmlElement =
         val stateContainer = StateContainer[State, Event](
             State.Initial,
             (state, event) => state.reduce(event),
         )
 
-        val globalEvents = stateContainer.events.withCurrentValueOf(stateContainer.state, props).collect:
+        // Certain of the local events (State.Add) should trigger an update to global state
+        val globalEvents = stateContainer.events.withCurrentValueOf(stateContainer.state, propsSignal).collect:
             case (Event.Add, State.Adding(name), Props(existingNames)) if !existingNames.contains(name.strip()) =>
                 GlobalEvent.NewList(name.strip())
 
-        val adder = stateContainer.state.combineWith(props)
-            .routeSignal({ case (State.Initial, _) => () })(
-                _ => button("Add list", onClick.mapTo(Event.StartAdding) --> stateContainer.input)
-            )
-            .routeSignal({ case tup @ (_: State.Adding, props) => tup }) { signal =>
-                val addingSignal = signal.map:
-                    case (addingState: State.Adding, props) => Some((addingState, props))
-                    case _ => None
+        val adder = stateContainer.state.combineWith(propsSignal)
+            .routeSignal({ case (State.Initial, _) => () }) { _ =>
+                button(
+                    "Add list",
+                    onClick.mapTo(Event.StartAdding) --> stateContainer.input,
+                )
+            }
+            .routeSignal({ case (st: State.Adding, props) => (st, props) }) { signal =>
+                val addingSignal = signal.map(_._1)
+
+                val addDisabled = signal.map:
+                    case (State.Adding(nameText), Props(existingNames)) => existingNames.contains(nameText.strip())
 
                 div(
                     "New list:",
                     input(
                         controlled(
-                            value <-- addingSignal.map(_.map(_._1.nameText).getOrElse("")),
-                            onInput.map(v => Event.SetNameText(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> stateContainer.input,
+                            value <-- addingSignal.map(_.nameText),
+                            onInput.mapToValue.map(Event.SetNameText(_)) --> stateContainer.input,
                         )
                     ),
-                    button("Add", onClick.mapTo(Event.Add) --> stateContainer.input),
+                    button("Add", disabled <-- addDisabled, onClick.mapTo(Event.Add) --> stateContainer.input),
                     button("Cancel", onClick.mapTo(Event.StopAdding) --> stateContainer.input),
                 )
             }

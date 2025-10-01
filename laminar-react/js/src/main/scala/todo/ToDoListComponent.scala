@@ -1,27 +1,33 @@
 package todo
 
 import com.raquo.laminar.api.L.{*, given}
-import todo.model.{ToDo, ToDoList, ToDoListState}
+import todo.model.{GlobalEvent, ToDo, ToDoList, ToDoListState}
 
 
 object ToDoListComponent:
     final case class Props(list: ToDoList, state: ToDoListState)
 
-    def apply(listSignal: Signal[Props]): HtmlElement =
-        val toDosSignal = listSignal.map:
-            case Props(list, ToDoListState(toDos, doneToDos)) =>
+    def apply(propsSignal: Signal[Props]): HtmlElement =
+        val toDosSignal = propsSignal.map:
+            case Props(list, ToDoListState(toDos, _)) =>
                 toDos.zipWithIndex.map:
                     case (toDo, index) =>
                         ToDoComponent.Props(toDo, list, index)
 
+        val doneToDosSignal = propsSignal.map:
+            case Props(list, ToDoListState(_, doneToDos)) =>
+                doneToDos.zipWithIndex.map:
+                    case (toDo, index) =>
+                        DoneToDoComponent.Props(toDo, list, index)
+
         div(
-            h2(text <-- listSignal.map(_.list.name)),
+            h2(text <-- propsSignal.map(_.list.name)),
             h3("To Do"),
-            child <-- AddToDoComponent(listSignal.map(props => AddToDoComponent.Props(props.list, props.state.toDos.map(_.label).toSet))),
+            child <-- AddToDoComponent(propsSignal.map(props => AddToDoComponent.Props(props.list, props.state.toDos.map(_.label).toSet))),
             children <-- toDosSignal.split(_.toDo.label) {
                 (_, _, toDoSignal) => ToDoComponent(toDoSignal.distinct)
             },
             h3("Done"),
-            children <-- listSignal.map(_.state.doneToDos).split(_.label):
-                case (label, _, _) => span(label, marginRight := "10px")
+            children <-- doneToDosSignal.split(_._1.label):
+                case (_, _, doneToDoSignal) => DoneToDoComponent(doneToDoSignal.distinct)
         )

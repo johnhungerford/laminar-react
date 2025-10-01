@@ -4,8 +4,8 @@ import com.raquo.laminar.api.L.{*, given}
 import org.scalajs.dom
 import org.scalajs.dom.HTMLInputElement
 import todo.model.{GlobalEvent, ToDo, ToDoList}
-import todo.util.StateContainer
-import todo.util.routeSignal
+import util.routeSignal
+import util.StateContainer
 
 
 object AddToDoComponent:
@@ -31,20 +31,20 @@ object AddToDoComponent:
         case SetLabel(value: String)
         case SetDetails(value: String)
 
-    def apply(addToDoSignal: Signal[Props]): Signal[HtmlElement] =
-        addToDoSignal.map(_.list).distinct.flatMapSwitch: currentList =>
+    def apply(propsSignal: Signal[Props]): Signal[HtmlElement] =
+        propsSignal.map(_.list).distinct.flatMapSwitch: currentList =>
             val stateContainer = StateContainer[State, Event](
                 State.Initial,
                 (state, event) => state.reduce(event)
             )
 
-            val globalEvents = stateContainer.events.withCurrentValueOf(addToDoSignal, stateContainer.state).collect:
+            val globalEvents = stateContainer.events.withCurrentValueOf(propsSignal, stateContainer.state).collect:
                 case (Event.Add, Props(list, _), State.Adding(label, details)) =>
                     println(s"Adding $label with details: $details")
                     val detailsOpt = if details.strip().isEmpty then None else Some(details.strip())
                     GlobalEvent.NewToDo(list, label.strip(), detailsOpt)
 
-            stateContainer.state.combineWith(addToDoSignal)
+            stateContainer.state.combineWith(propsSignal)
                 .routeSignal({ case (State.Initial, _) => () }) { _ =>
                     button(
                         "Add todo",

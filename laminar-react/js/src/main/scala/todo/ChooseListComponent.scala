@@ -8,8 +8,8 @@ import todo.model.{GlobalEvent, ToDo, ToDoList, ToDoListState}
 object ChooseListComponent:
     final case class Props(lists: Seq[ToDoList])
 
-    def apply(listSignal: Signal[Props]): HtmlElement =
-        val options = listSignal.map(_.lists).split(_.name):
+    def apply(propsSignal: Signal[Props]): HtmlElement =
+        val options = propsSignal.map(_.lists).split(_.name):
             case (name, list, _) => option(name, value := name)
 
         div(
@@ -17,5 +17,5 @@ object ChooseListComponent:
                 onChange.map(v => GlobalEvent.SelectList(ToDoList(v.currentTarget.asInstanceOf[HTMLSelectElement].value))) --> globalState.input,
                 children <-- options,
             ),
-            AddListComponent(listSignal.map(v => AddListComponent.Props(v.lists.map(_.name).toSet))),
+            AddListComponent(propsSignal.map(v => AddListComponent.Props(v.lists.map(_.name).toSet))),
         )

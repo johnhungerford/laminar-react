@@ -4,26 +4,26 @@ import com.raquo.laminar.api.L.{*, given}
 import todo.model.{GlobalEvent, ToDo, ToDoList}
 
 
-object ToDoComponent:
+object DoneToDoComponent:
     final case class Props(toDo: ToDo, list: ToDoList, index: Int)
 
     enum Event:
-        case Complete, Delete
+        case Restore, Delete
 
     def apply(propsSignal: Signal[Props]): HtmlElement =
         val completeEvents = EventBus[Event]()
 
         val globalEvents = completeEvents.events.withCurrentValueOf(propsSignal).map:
-            case (Event.Complete, Props(_, list, index)) => GlobalEvent.CompleteToDo(list, index)
-            case (Event.Delete, Props(_, list, index)) => GlobalEvent.DeleteToDo(list, index)
+            case (Event.Restore, Props(_, list, index)) => GlobalEvent.RestoreToDo(list, index)
+            case (Event.Delete, Props(_, list, index)) => GlobalEvent.DeleteCompletedToDo(list, index)
 
         div(
-            h4(text <-- propsSignal.map(_._1.label)),
-            child.maybe <-- propsSignal.map(v => v._1.details.map(txt => div(txt))),
             div(
                 display.flex,
                 flexDirection.row,
-                button("Complete", onClick.mapTo(Event.Complete) --> completeEvents.writer),
+                alignItems.center,
+                p(text <-- propsSignal.map(_._1.label)),
+                button("Restore", onClick.mapTo(Event.Restore) --> completeEvents.writer),
                 button("Remove", onClick.mapTo(Event.Delete) --> completeEvents.writer),
             ),
             globalEvents --> globalState.input,
