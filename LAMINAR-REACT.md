@@ -68,7 +68,6 @@ final case class State(inputType: Option[InputType])
 val state = Var(State(None))
 
 val element = div(
-    h1("Example"),
     select(
         option(
             "Choose input type",
@@ -123,14 +122,7 @@ val element = div(
             )
 
     },
-    padding := "20px",
 )
-
-render(
-    document.querySelector("#app"),
-    element,
-)
-
 ```
 
 In the above example, the first `select` element chooses the input type, and the next `child` "receiver" is bound to an element rendered from the current state. (Scala's support for pattern matching makes conditional rendering from state much more elegant than in Javascript frameworks.)
@@ -160,7 +152,26 @@ Laminar has part of a solution out-of-the-box with the `splitOne` method on a si
 
 ```scala
 val element = div(
-    ...
+    select(
+        option(
+            "Choose input type",
+            value := "none",
+        ),
+        option(
+            "Select",
+            value := "select",
+        ),
+        option(
+            "Text",
+            value := "text",
+        ),
+        value := "none",
+        onChange.mapToValue --> Observer[String] {
+            case "none" => state.set(State(None))
+            case "select" => state.set(State(Some(InputType.SelectionInput(None))))
+            case "text" => state.set(State(Some(InputType.TextInput(""))))
+        },
+    ),
     child <-- state.signal.splitOne({
         case State(None) => 0
         case State(Some(InputType.SelectionInput(_))) => 1
@@ -203,7 +214,6 @@ val element = div(
                 ),
             )
     },
-    ...
 )
 ```
 
@@ -278,49 +288,72 @@ Now that we have a more straightforward way of routing our signal, let's update 
 
 ```scala
 val element = div(
-	...
-	child <-- state.signal
-	    .routeSignal({ case State(None) => () })(_ => div())
-	    .routeSignal({
-	        case State(Some(selectState @ InputType.SelectionInput(_))) => selectState
-	    }) { selectStateSignal =>
-	        select(
-	            option(
-	                "No selection",
-	                value := "none",
-	            ),
-	            option(
-	                "True",
-	                value := "true",
-	            ),
-	            option(
-	                "False",
-	                value := "false",
-	            ),
-	            value <-- selectStateSignal.map {
-	                case InputType.SelectionInput(None) => "none"
-	                case InputType.SelectionInput(Some(true)) => "true"
-	                case InputType.SelectionInput(Some(false)) => "false"
-	            },
-	            onChange.mapToValue --> Observer[String] {
-	                case "none" => state.set(State(Some(InputType.SelectionInput(None))))
-	                case "true" => state.set(State(Some(InputType.SelectionInput(Some(true)))))
-	                case "false" => state.set(State(Some(InputType.SelectionInput(Some(false)))))
-	            },
-	        )
-	    }
-	    .routeSignal({
-	        case State(Some(textState@InputType.TextInput(_))) => textState
-	    }) { textStateSignal =>
-	        input(
-	            value <-- textStateSignal.map(_.textValue),
-	            onInput.mapToValue --> Observer[String](
-	                newValue => state.set(State(Some(InputType.TextInput(newValue))))
-	            ),
-	        )
-	    }
-	    .result, // This will throw a match error if we leave out a case
-	...
+    select(
+        option(
+            "Choose input type",
+            value := "none",
+        ),
+        option(
+            "Select",
+            value := "select",
+        ),
+        option(
+            "Text",
+            value := "text",
+        ),
+        value := "none",
+        onChange.mapToValue --> Observer[String] {
+            case "none" => state.set(State(None))
+            case "select" => state.set(State(Some(InputType.SelectionInput(None))))
+            case "text" => state.set(State(Some(InputType.TextInput(""))))
+        },
+    ),
+    child <-- state.signal
+        .routeSignal({
+            case State(None) => ()
+        }) { _ =>
+            div()
+        }
+        .routeSignal({
+            case State(Some(selectState @ InputType.SelectionInput(_))) => selectState
+        }) { selectStateSignal =>
+            select(
+                option(
+                    "No selection",
+                    value := "none",
+                ),
+                option(
+                    "True",
+                    value := "true",
+                ),
+                option(
+                    "False",
+                    value := "false",
+                ),
+                value <-- selectStateSignal.map {
+                    case InputType.SelectionInput(None) => "none"
+                    case InputType.SelectionInput(Some(true)) => "true"
+                    case InputType.SelectionInput(Some(false)) => "false"
+                },
+                onChange.mapToValue --> Observer[String] {
+                    case "none" => state.set(State(Some(InputType.SelectionInput(None))))
+                    case "true" => state.set(State(Some(InputType.SelectionInput(Some(true)))))
+                    case "false" => state.set(State(Some(InputType.SelectionInput(Some(false)))))
+                },
+            )
+        }
+        .routeSignal({
+            case State(Some(textState@InputType.TextInput(_))) => textState
+        }) { textStateSignal =>
+            input(
+                value <-- textStateSignal.map(_.textValue),
+                onInput.mapToValue --> Observer[String](
+                    newValue => state.set(State(Some(InputType.TextInput(newValue))))
+                ),
+            )
+        }
+        .result,
+    padding := "20px",
 )
 ```
 
@@ -341,17 +374,23 @@ Though `.routeSignal` solves the rendering issue for single elements, anyone who
 ```scala
 case class Person(name: String, age: Int)
 
-val state = Var(Vector(Person("John", 41), Person("Angie", 52), Person("Derek", 28)))
+val state = Var(Vector(Person("John", 41), Person("Angie", 52), Person("Derek", 28), Person("Sharon", 78)))
 
-val element = ul(
-	children <-- state.signal.split(_.name) { (_, _, signal) =>
-		li(text <-- signal.map(v => s"${v.name}: ${v.age} years old").distinct)
-	},
-	ul(button("reverse", onClick --> Observer[Any](_ => state.update(_.reverse))))
+ul(
+    children <-- state.signal.split(_.name) { (_, _, signal) =>
+        li(
+            text <-- signal.map(v => s"${v.name}: ${v.age} years old").distinct,
+            input(`type` := "checkbox", marginLeft := "10px"),
+        )
+    },
+    ul(
+        button("reverse", onClick --> Observer[Any](_ => state.update(_.reverse))),
+        marginTop := "15px",
+    )
 )
 ```
 
-In the above example, rearranging the list of people will not rerender any of the individual list items. For instance, if you select any of the text and then click the "reverse" button, the selection will remain.
+In the above example, rearranging the list of people will not rerender any of the individual list items. For instance, if you select any of the checkboxes and then click the "reverse" button, the selection will remain (since the checkboxes state is not controlled, rerendering would clear the selection).
 
 ## Application architecture
 
@@ -442,6 +481,8 @@ object Window2State:
 ```
 
 We see here a general pattern for constructing an application in a React-like way. Components are just functions from a signal to an element (defined in the above example as objects with `apply` methods). Each component function can route its input signal, narrowing the state down to the parts relevent to each of its child. DOM event listeners can be mapped to domain events and wired into event handlers.
+
+For an example of a more elaborate application see the [To-Do list app](laminar-react/js/src/main/scala/todo/AppComponent.scala) in this repository.
 
 ## Conclusion
 

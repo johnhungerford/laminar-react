@@ -6,6 +6,7 @@ import org.scalajs.dom.HTMLInputElement
 import todo.model.{GlobalEvent, ToDo, ToDoList}
 import util.routeSignal
 import util.StateContainer
+import io.github.nguyenyou.webawesome.laminar.{Button, Input, Checkbox, Divider, Icon, Select, UOption}
 
 
 object AddToDoComponent:
@@ -46,11 +47,16 @@ object AddToDoComponent:
 
             stateContainer.state.combineWith(propsSignal)
                 .routeSignal({ case (State.Initial, _) => () }) { _ =>
-                    button(
-                        "Add todo",
-                        onClick.mapTo(Event.StartAdding) --> stateContainer.input,
-                        stateContainer.bind,
-                        globalEvents --> globalState.input,
+                    div(
+                        Button(
+                            _.slots.start(Icon(_.name := "add", _.label := "close")()),
+                            _.appearance.plain,
+                        )(
+                            "Add todo",
+                            onClick.mapTo(Event.StartAdding) --> stateContainer.input,
+                            stateContainer.bind,
+                            globalEvents --> globalState.input,
+                        )
                     )
                 }
                 .routeSignal({ case (st: State.Adding, pr: Props) => (st, pr) }) { signal =>
@@ -62,27 +68,27 @@ object AddToDoComponent:
                             label.strip().isEmpty || existingLabels.contains(label.strip())
 
                     div(
-                        div(
-                            "Label",
-                            input(
-                                controlled(
-                                    value <-- addingSignal.map(_.labelText),
-                                    onInput.map(v => Event.SetLabel(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> stateContainer.input,
-                                )
-                            ),
+                        className := "wa-stack",
+                        Input(
+                            _.label := "Label",
+                        )(
+                            value <-- addingSignal.map(_.labelText),
+                            onInput.map(v => Event.SetLabel(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> stateContainer.input,
+                        ),
+                        Input(
+                            _.label := "Details",
+                        )(
+                            value <-- addingSignal.map(_.detailsText),
+                            onInput.map(v => Event.SetDetails(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> stateContainer.input,
                         ),
                         div(
-                            "Details",
-                            input(
-                                controlled(
-                                    value <-- addingSignal.map(_.detailsText),
-                                    onInput.map(v => Event.SetDetails(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> stateContainer.input,
-                                )
-                            ),
+                            className := "wa-cluster",
+                            Button(_.appearance.filled)("Add", disabled <-- addDisabled, onClick.mapTo(Event.Add) --> stateContainer.input),
+                            Button(_.appearance.filled)("Cancel", onClick.mapTo(Event.StopAdding) --> stateContainer.input),
                         ),
-                        button("Add", disabled <-- addDisabled, onClick.mapTo(Event.Add) --> stateContainer.input),
-                        button("Exit", onClick.mapTo(Event.StopAdding) --> stateContainer.input),
 
+                        // Bind events
+                        onMountFocus,
                         stateContainer.bind,
                         globalEvents --> globalState.input,
                     )

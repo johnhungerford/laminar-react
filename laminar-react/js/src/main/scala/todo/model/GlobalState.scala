@@ -13,7 +13,7 @@ final case class GlobalState(
               else
                   val newList = ToDoList(name)
                   copy(
-                      selectedList = selectedList.orElse(Some(newList)), // Select list if one isn't selected
+                      selectedList = Some(newList),
                       lists = lists + (newList -> ToDoListState.initial),
                   )
           case GlobalEvent.DeleteList(list) =>

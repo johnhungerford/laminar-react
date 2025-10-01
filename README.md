@@ -14,4 +14,4 @@ This will compile all the code to Javascript, bundle it, and deploy in a browser
 
 ## Article
 
-See [LAMINAR-REACT.md](LAMINAR-REACT.md) for an explanation of the examples
+See [LAMINAR-REACT.md](LAMINAR-REACT.md) for a discussion of how to use Laminar in a React-like style and explanations of the various examples.

@@ -8,9 +8,29 @@ import com.raquo.laminar.api.L.{*, given}
  * subscriptions to events and state updates
  */
 trait StateContainer[State, Event]:
+    /** Handler for events.
+      * Usage:
+      *   button("Click me", onClick.mapTo(SomeEvent) --> stateContainer.input)
+      */
     def input: Sink[Event]
+
+    /** Provides access to all events. Can be used for logging events or to send
+      * events to a service for further processing (e.g., event sourcing)
+      */
     def events: EventStream[Event]
+
+    /** Signal publishing latest version of state.
+      * Usage:
+      *   h1(text <-- stateContainer.state.map(_.path.to.headerText)) 
+      */
     def state: Signal[State]
+
+    /** Binds event input to the state updater. Must be attached to a Laminar
+      * element somewhere for event handling to work.
+      * 
+      * Usage:
+      *   div(TopLevelComponent(), stateContainer.bind)
+      */
     def bind: Binder[Element]
 
 object StateContainer:

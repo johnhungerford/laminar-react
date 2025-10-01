@@ -14,7 +14,6 @@ object Example3RouteSignal:
         val state = Var(State(None))
 
         div(
-            h1("Example"),
             select(
                 option(
                     "Choose input type",

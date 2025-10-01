@@ -13,7 +13,6 @@ object Example2SplitOne:
         val state = Var(State(None))
 
         div(
-            h1("Example"),
             select(
                 option(
                     "Choose input type",
@@ -76,5 +75,4 @@ object Example2SplitOne:
                         ),
                     )
             },
-            padding := "20px",
         )

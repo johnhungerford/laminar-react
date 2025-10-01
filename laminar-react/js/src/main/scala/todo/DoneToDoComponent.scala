@@ -2,6 +2,7 @@ package todo
 
 import com.raquo.laminar.api.L.{*, given}
 import todo.model.{GlobalEvent, ToDo, ToDoList}
+import io.github.nguyenyou.webawesome.laminar.{Button, Card, Checkbox, Divider, Icon, Select, UOption}
 
 
 object DoneToDoComponent:
@@ -18,13 +19,12 @@ object DoneToDoComponent:
             case (Event.Delete, Props(_, list, index)) => GlobalEvent.DeleteCompletedToDo(list, index)
 
         div(
+            className := "wa-split",
             div(
-                display.flex,
-                flexDirection.row,
-                alignItems.center,
-                p(text <-- propsSignal.map(_._1.label)),
-                button("Restore", onClick.mapTo(Event.Restore) --> completeEvents.writer),
-                button("Remove", onClick.mapTo(Event.Delete) --> completeEvents.writer),
+                className := "wa-cluster",
+                Button(_.appearance.plain)(Icon(_.name := "arrows-rotate", _.label := "restore")(), onClick.mapTo(Event.Restore) --> completeEvents.writer),
+                div(text <-- propsSignal.map(_._1.label)),
             ),
+            Button(_.appearance.plain)(Icon(_.name := "xmark", _.label := "close")(), onClick.mapTo(Event.Delete) --> completeEvents.writer),
             globalEvents --> globalState.input,
         )

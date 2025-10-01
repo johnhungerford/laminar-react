@@ -5,6 +5,7 @@ import org.scalajs.dom.HTMLInputElement
 import todo.model.GlobalEvent
 import util.routeSignal
 import util.StateContainer
+import io.github.nguyenyou.webawesome.laminar.{Divider, Select, UOption, Card, Button, Input}
 
 
 object AddListComponent:
@@ -39,27 +40,33 @@ object AddListComponent:
 
         val adder = stateContainer.state.combineWith(propsSignal)
             .routeSignal({ case (State.Initial, _) => () }) { _ =>
-                button(
-                    "Add list",
+                Button(_.appearance.filled)(
+                    "New list",
                     onClick.mapTo(Event.StartAdding) --> stateContainer.input,
                 )
             }
             .routeSignal({ case (st: State.Adding, props) => (st, props) }) { signal =>
                 val addingSignal = signal.map(_._1)
 
-                val addDisabled = signal.map:
-                    case (State.Adding(nameText), Props(existingNames)) => existingNames.contains(nameText.strip())
+                val addDisabled: Signal[Boolean] = signal.map:
+                    case (State.Adding(nameText), Props(existingNames)) =>
+                        val stripped = nameText.strip()
+                        stripped.isEmpty || existingNames.contains(stripped)
 
-                div(
-                    "New list:",
-                    input(
-                        controlled(
+                Card()(
+                    div(
+                        className := "wa-stack",
+                        h4("New list"),
+                        Input()(
                             value <-- addingSignal.map(_.nameText),
                             onInput.mapToValue.map(Event.SetNameText(_)) --> stateContainer.input,
+                        ),
+                        div(
+                            className := "wa-cluster",
+                            Button(_.appearance.filled)("Add", disabled <-- addDisabled, onClick.mapTo(Event.Add) --> stateContainer.input),
+                            Button(_.appearance.filled)("Cancel", onClick.mapTo(Event.StopAdding) --> stateContainer.input),
                         )
-                    ),
-                    button("Add", disabled <-- addDisabled, onClick.mapTo(Event.Add) --> stateContainer.input),
-                    button("Cancel", onClick.mapTo(Event.StopAdding) --> stateContainer.input),
+                    )
                 )
             }
             .result
