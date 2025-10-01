@@ -20,11 +20,11 @@ object App:
             case State.ToDoApp => "To-Do Application"
         }
 
+    private val cases = State.values.toList
+    private val stateLookup = cases.map(st => st.toString -> st).toMap
+
     def main(args: Array[String]): Unit = {
         val state = Var(State.Example1)
-
-        val cases = State.values.toList
-        val stateLookup = cases.map(st => st.toString -> st).toMap
 
         val options = cases.map: example =>
             option(
@@ -38,18 +38,14 @@ object App:
             select(
                 options,
                 value <-- state.signal.map(_.toString),
-                onChange.mapToValue --> state.writer.contramap((name: String) => {
-                    val state = stateLookup(name)
-                    println(state)
-                    state
-                }),
+                onChange.mapToValue --> state.writer.contramap((name: String) => stateLookup(name)),
             ),
             child <-- state.signal.map(st => h2(st.label)),
             child <-- state.signal
-                .routeSignal({ case State.Example1 => () })(_ => Example1Naive.element)
-                .routeSignal({ case State.Example2 => () })(_ => Example2SplitOne.element)
-                .routeSignal({ case State.Example3 => () })(_ => Example3RouteSignal.element)
-                .routeSignal({ case State.Example4 => () })(_ => Example4SplitArray.element)
+                .routeSignal({ case State.Example1 => () })(_ => Example1Naive())
+                .routeSignal({ case State.Example2 => () })(_ => Example2SplitOne())
+                .routeSignal({ case State.Example3 => () })(_ => Example3RouteSignal())
+                .routeSignal({ case State.Example4 => () })(_ => Example4SplitArray())
                 .routeSignal({ case State.ToDoApp => () })(_ => AppComponent())
                 .result,
             padding := "100px",

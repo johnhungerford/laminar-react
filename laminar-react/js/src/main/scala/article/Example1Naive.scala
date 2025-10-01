@@ -1,18 +1,20 @@
 package article
 
 import com.raquo.laminar.api.L.{*, given}
-import org.scalajs.dom.document
+import com.raquo.laminar.nodes.ReactiveHtmlElement
+import org.scalajs.dom.{HTMLDivElement, document}
 
 object Example1Naive:
-        enum InputType:
-            case SelectionInput(selectedValue: Option[Boolean])
-            case TextInput(textValue: String)
+    enum InputType:
+        case SelectionInput(selectedValue: Option[Boolean])
+        case TextInput(textValue: String)
 
-        final case class State(inputType: Option[InputType])
+    final case class State(inputType: Option[InputType])
 
+    def apply(): HtmlElement =
         val state = Var(State(None))
 
-        val element = div(
+        div(
             h1("Example"),
             select(
                 option(
@@ -69,11 +71,5 @@ object Example1Naive:
 
             },
             padding := "20px"
+        )
 
-        , // Properties can also be set with static values
-        )
-//        val element = AppComponent()
-        render(
-            document.querySelector("#app"),
-            element,
-        )
