@@ -21,8 +21,8 @@ object ToDoComponent:
     enum Event:
         case Complete, Delete, Expand, Collapse
 
-    def apply(propsSignal: Signal[Props]): HtmlElement =
-        val stateContainer = StateContainer[State, Event](
+    def apply(propsSignal: Signal[Props])(using globalState: GlobalStore): HtmlElement =
+        val localState = StateContainer[State, Event](
             State.Collapsed,
             (state, event) => {
                 println(s"$state <-- $event")
@@ -30,7 +30,7 @@ object ToDoComponent:
             },
         )
 
-        val globalEvents = stateContainer.events.withCurrentValueOf(propsSignal).collect:
+        val globalEvents = localState.events.withCurrentValueOf(propsSignal).collect:
             case (Event.Complete, Props(_, list, index)) => GlobalEvent.CompleteToDo(list, index)
             case (Event.Delete, Props(_, list, index)) => GlobalEvent.DeleteToDo(list, index)
 
@@ -41,21 +41,21 @@ object ToDoComponent:
                     className := "wa-split",
                     div(
                         className := "wa-cluster",
-                        Checkbox()(onClick.mapTo(Event.Complete) --> stateContainer.input),
+                        Checkbox()(onClick.mapTo(Event.Complete) --> localState.input),
                         strong(text <-- propsSignal.map(_._1.label)),
-                        child <-- stateContainer.state.combineWith(propsSignal.map(_.toDo.details)).map:
+                        child <-- localState.state.combineWith(propsSignal.map(_.toDo.details)).map:
                             case (_, None) => emptyNode
                             case (State.Collapsed, _) =>
-                                Button(_.appearance.plain)(Icon(_.name := "chevron-right", _.label := "expand")(), onClick.mapTo(Event.Expand) --> stateContainer.input)
+                                Button(_.appearance.plain)(Icon(_.name := "chevron-right", _.label := "expand")(), onClick.mapTo(Event.Expand) --> localState.input)
                             case (State.Expanded, _) =>
-                                Button(_.appearance.plain)(Icon(_.name := "chevron-down", _.label := "collapse")(), onClick.mapTo(Event.Collapse) --> stateContainer.input),
+                                Button(_.appearance.plain)(Icon(_.name := "chevron-down", _.label := "collapse")(), onClick.mapTo(Event.Collapse) --> localState.input),
                     ),
-                    Button(_.appearance.plain)(Icon(_.name := "xmark", _.label := "close")(), onClick.mapTo(Event.Delete) --> stateContainer.input),
+                    Button(_.appearance.plain)(Icon(_.name := "xmark", _.label := "close")(), onClick.mapTo(Event.Delete) --> localState.input),
                 ),
-                child.maybe <-- propsSignal.combineWith(stateContainer.state).map:
+                child.maybe <-- propsSignal.combineWith(localState.state).map:
                     case (Props(ToDo(_, Some(details)), _, _), State.Expanded) => Some(div(details))
                     case _ => None
             ),
-            stateContainer.bind,
+            localState.bind,
             globalEvents --> globalState.input,
         )

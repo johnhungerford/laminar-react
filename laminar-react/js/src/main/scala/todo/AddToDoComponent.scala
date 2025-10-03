@@ -32,20 +32,20 @@ object AddToDoComponent:
         case SetLabel(value: String)
         case SetDetails(value: String)
 
-    def apply(propsSignal: Signal[Props]): Signal[HtmlElement] =
+    def apply(propsSignal: Signal[Props])(using globalState: GlobalStore): Signal[HtmlElement] =
         propsSignal.map(_.list).distinct.flatMapSwitch: currentList =>
-            val stateContainer = StateContainer[State, Event](
+            val localState = StateContainer[State, Event](
                 State.Initial,
                 (state, event) => state.reduce(event)
             )
 
-            val globalEvents = stateContainer.events.withCurrentValueOf(propsSignal, stateContainer.state).collect:
+            val globalEvents = localState.events.withCurrentValueOf(propsSignal, localState.state).collect:
                 case (Event.Add, Props(list, _), State.Adding(label, details)) =>
                     println(s"Adding $label with details: $details")
                     val detailsOpt = if details.strip().isEmpty then None else Some(details.strip())
                     GlobalEvent.NewToDo(list, label.strip(), detailsOpt)
 
-            stateContainer.state.combineWith(propsSignal)
+            localState.state.combineWith(propsSignal)
                 .routeSignal({ case (State.Initial, _) => () }) { _ =>
                     div(
                         Button(
@@ -53,8 +53,8 @@ object AddToDoComponent:
                             _.appearance.plain,
                         )(
                             "Add todo",
-                            onClick.mapTo(Event.StartAdding) --> stateContainer.input,
-                            stateContainer.bind,
+                            onClick.mapTo(Event.StartAdding) --> localState.input,
+                            localState.bind,
                             globalEvents --> globalState.input,
                         )
                     )
@@ -73,23 +73,23 @@ object AddToDoComponent:
                             _.label := "Label",
                         )(
                             value <-- addingSignal.map(_.labelText),
-                            onInput.map(v => Event.SetLabel(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> stateContainer.input,
+                            onInput.map(v => Event.SetLabel(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> localState.input,
                         ),
                         Input(
                             _.label := "Details",
                         )(
                             value <-- addingSignal.map(_.detailsText),
-                            onInput.map(v => Event.SetDetails(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> stateContainer.input,
+                            onInput.map(v => Event.SetDetails(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> localState.input,
                         ),
                         div(
                             className := "wa-cluster",
-                            Button(_.appearance.filled)("Add", disabled <-- addDisabled, onClick.mapTo(Event.Add) --> stateContainer.input),
-                            Button(_.appearance.filled)("Cancel", onClick.mapTo(Event.StopAdding) --> stateContainer.input),
+                            Button(_.appearance.filled)("Add", disabled <-- addDisabled, onClick.mapTo(Event.Add) --> localState.input),
+                            Button(_.appearance.filled)("Cancel", onClick.mapTo(Event.StopAdding) --> localState.input),
                         ),
 
                         // Bind events
                         onMountFocus,
-                        stateContainer.bind,
+                        localState.bind,
                         globalEvents --> globalState.input,
                     )
                 }

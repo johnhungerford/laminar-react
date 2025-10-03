@@ -27,22 +27,22 @@ object AddListComponent:
             case Event.SetNameText(value) => Adding(value)
             case Event.Add => Initial
 
-    def apply(propsSignal: Signal[Props]): HtmlElement =
-        val stateContainer = StateContainer[State, Event](
+    def apply(propsSignal: Signal[Props])(using globalState: GlobalStore): HtmlElement =
+        val localState = StateContainer[State, Event](
             State.Initial,
             (state, event) => state.reduce(event),
         )
 
         // Certain of the local events (State.Add) should trigger an update to global state
-        val globalEvents = stateContainer.events.withCurrentValueOf(stateContainer.state, propsSignal).collect:
+        val globalEvents = localState.events.withCurrentValueOf(localState.state, propsSignal).collect:
             case (Event.Add, State.Adding(name), Props(existingNames)) if !existingNames.contains(name.strip()) =>
                 GlobalEvent.NewList(name.strip())
 
-        val adder = stateContainer.state.combineWith(propsSignal)
+        val adder = localState.state.combineWith(propsSignal)
             .routeSignal({ case (State.Initial, _) => () }) { _ =>
                 Button(_.appearance.filled)(
                     "New list",
-                    onClick.mapTo(Event.StartAdding) --> stateContainer.input,
+                    onClick.mapTo(Event.StartAdding) --> localState.input,
                 )
             }
             .routeSignal({ case (st: State.Adding, props) => (st, props) }) { signal =>
@@ -59,12 +59,12 @@ object AddListComponent:
                         h4("New list"),
                         Input()(
                             value <-- addingSignal.map(_.nameText),
-                            onInput.mapToValue.map(Event.SetNameText(_)) --> stateContainer.input,
+                            onInput.mapToValue.map(Event.SetNameText(_)) --> localState.input,
                         ),
                         div(
                             className := "wa-cluster",
-                            Button(_.appearance.filled)("Add", disabled <-- addDisabled, onClick.mapTo(Event.Add) --> stateContainer.input),
-                            Button(_.appearance.filled)("Cancel", onClick.mapTo(Event.StopAdding) --> stateContainer.input),
+                            Button(_.appearance.filled)("Add", disabled <-- addDisabled, onClick.mapTo(Event.Add) --> localState.input),
+                            Button(_.appearance.filled)("Cancel", onClick.mapTo(Event.StopAdding) --> localState.input),
                         )
                     )
                 )
@@ -73,6 +73,6 @@ object AddListComponent:
 
         div(
             child <--adder,
-            stateContainer.bind,
+            localState.bind,
             globalEvents --> globalState.input,
         )

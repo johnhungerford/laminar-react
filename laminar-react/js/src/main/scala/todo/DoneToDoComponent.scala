@@ -11,7 +11,7 @@ object DoneToDoComponent:
     enum Event:
         case Restore, Delete
 
-    def apply(propsSignal: Signal[Props]): HtmlElement =
+    def apply(propsSignal: Signal[Props])(using globalState: GlobalStore): HtmlElement =
         val completeEvents = EventBus[Event]()
 
         val onClickMappedToIndex = onClick.compose(

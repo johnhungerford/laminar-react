@@ -10,7 +10,7 @@ import io.github.nguyenyou.webawesome.laminar.{Divider, Select, UOption, Card}
 object ChooseListComponent:
     final case class Props(selectedList: Option[ToDoList], lists: Seq[ToDoList])
 
-    def apply(propsSignal: Signal[Props]): HtmlElement =
+    def apply(propsSignal: Signal[Props])(using globalState: GlobalStore): HtmlElement =
         div(
             className := "wa-stack",
             child <-- propsSignal

@@ -8,7 +8,7 @@ import io.github.nguyenyou.webawesome.laminar.{Button, Card, Checkbox, Divider, 
 object ToDoListComponent:
     final case class Props(list: ToDoList, state: ToDoListState)
 
-    def apply(propsSignal: Signal[Props]): HtmlElement =
+    def apply(propsSignal: Signal[Props])(using globalState: GlobalStore): HtmlElement =
         val toDosSignal = propsSignal.map:
             case Props(list, ToDoListState(toDos, _)) =>
                 toDos.zipWithIndex.map:
