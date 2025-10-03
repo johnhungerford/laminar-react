@@ -14,6 +14,11 @@ object DoneToDoComponent:
     def apply(propsSignal: Signal[Props]): HtmlElement =
         val completeEvents = EventBus[Event]()
 
+        val onClickMappedToIndex = onClick.compose(
+            _.withCurrentValueOf(propsSignal).map:
+                case (_, Props(_, _, index)) => index
+        )
+
         val globalEvents = completeEvents.events.withCurrentValueOf(propsSignal).map:
             case (Event.Restore, Props(_, list, index)) => GlobalEvent.RestoreToDo(list, index)
             case (Event.Delete, Props(_, list, index)) => GlobalEvent.DeleteCompletedToDo(list, index)

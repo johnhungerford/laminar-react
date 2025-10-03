@@ -1,9 +1,9 @@
-import article.{Example0Simple, Example1Naive, Example2SplitOne, Example3RouteSignal, Example4SplitArray}
+import article.{Example0Simple, Example1Naive, Example2SplitOne, Example3RouteSignal, Example4SplitArray, Example5CombineSignals, Example6HandleWithSignal}
 import com.raquo.laminar.api.L.{*, given}
 import org.scalajs.dom.document
 import todo.AppComponent
 import util.routeSignal
-import io.github.nguyenyou.webawesome.laminar.{Divider, Select, UOption, Card}
+import io.github.nguyenyou.webawesome.laminar.{Card, Divider, Select, UOption}
 
 
 object App:
@@ -13,6 +13,8 @@ object App:
         case Example2
         case Example3
         case Example4
+        case Example5
+        case Example6
         case ToDoApp
 
         def label = this match {
@@ -21,6 +23,8 @@ object App:
             case State.Example2 => "Conditional Rendering: splitOne"
             case State.Example3 => "Conditional Rendering: SignalRouter"
             case State.Example4 => "Conditional Rendering: Array"
+            case State.Example5 => "Combining signals"
+            case State.Example6 => "Handle events using signals"
             case State.ToDoApp => "To-Do Application"
         }
 
@@ -62,6 +66,8 @@ object App:
                         .routeSignal({ case State.Example2 => () })(_ => Example2SplitOne())
                         .routeSignal({ case State.Example3 => () })(_ => Example3RouteSignal())
                         .routeSignal({ case State.Example4 => () })(_ => Example4SplitArray())
+                        .routeSignal({ case State.Example5 => () })(_ => Example5CombineSignals())
+                        .routeSignal({ case State.Example6 => () })(_ => Example6HandleWithSignal())
                         .routeSignal({ case State.ToDoApp => () })(_ => AppComponent())
                         .result,
                 )
