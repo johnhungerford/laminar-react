@@ -333,7 +333,7 @@ This new approach solves the rendering problem while keeping as closely as possi
 
 ### Update on changes only
 
-While our `SignalRouter` utility solves the main rendering problem, there is still the issue that any properties we have bound to our state signal will be updated each time the signal emits a new value, even if the value hasn't changed. This can lead to a fair amount of unnecessary updates. To avoid this problem, Laminar provides a `Signal#distinct` to generate a new signal that only emits values when the original signal emits a value different from the last one. This is sort of the Laminar equivalent of React's "diffing" of the virtual DOM.
+While our `SignalRouter` utility solves the main rendering problem, there is still the issue that any properties we have bound to our state signal will be updated each time the signal emits a new value, even if the value hasn't changed. This can lead to a fair amount of unnecessary updates. To avoid this problem, Laminar provides a `Signal#distinct` method to generate a new signal that only emits values when the original signal emits a value different from the last one. This is sort of the Laminar equivalent of React's "diffing" the virtual DOM.
 
 ### Reactive element arrays
 
@@ -416,7 +416,7 @@ object RepeatComponent:
         )
 
 
-// Top-level component that constructs the word and passes
+// Top-level element that constructs the word and passes
 // it down to RepeatComponent
 final case class State(inputText: String)
 
@@ -490,13 +490,13 @@ Note that we have extracted the `onClick` transformation outside of the `div(...
 
 ## Application architecture
 
-Now that we have all of the components we need to render state in a quasi-functional manner while avoiding unnecessary re-rendering, let's sketch what a complete React-like application would look like in Laminar.
+Now that we have all of the tools we need to render state in a quasi-functional manner while avoiding unnecessary re-rendering, let's sketch what a complete React-like application would look like in Laminar.
 
 ### State and events
 
 While React supports a number of different state management paradigms, Laminar is particular well-suited for *event-driven architecture*. This is because the reactive architecture is designed primarily for data rather than callbacks. Thus, instead of binding `onClick` to an observer that updates state via callback, it is cleaner to map the `onClick` DOM event to a custom event and bind the updated listener to an observer that processes these custom events.
 
-The result is to construct your top-level application state in a manner similar to redux: define a "store" (in our case we'll just make this a `Var`) and a "reducer" (a function that updates state based on events) and then wire them together:
+My preference is therefore to construct my top-level applicatison state in a manner similar to redux: define a "store" (in our case we'll just make this a `Var`) and a "reducer" (a function that updates state based an event) and then wire them together:
 
 ```scala
 enum WindowState:
@@ -541,7 +541,7 @@ object AppComponent:
 		)
 ```
 
-The top level component narrows the global state down to `WindowState`, filters out extraneous updates (see the use of `.distinct`, in `SignalRouter`), and passes this first to the menu component. It then conditionally renders the selected window, passing the further narrowed state to the appropriate window component.
+The top level component narrows the global state down to `WindowState`, filters out extraneous updates (see the use of `.distinct` in [`SignalRouter`](laminar-react/js/src/main/scala/util/SignalRouter.scala)), and passes this first to the menu component. It then conditionally renders the selected window, passing the further narrowed state to the appropriate window component.
 
 These components may not need to access the global state at all, but can simply use the signal passed to them:
 
