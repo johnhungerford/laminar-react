@@ -1,6 +1,6 @@
 package todo
 
-import todo.model.{GlobalEvent, GlobalState}
-import util.StateContainer
+import todo.model.{AppEvent, AppState}
+import common.StateContext
 
-type GlobalStore = StateContainer[GlobalState, GlobalEvent]
+type AppContext = StateContext[AppState, AppEvent]

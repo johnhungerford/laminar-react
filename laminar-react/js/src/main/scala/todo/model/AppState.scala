@@ -2,13 +2,13 @@ package todo.model
 
 import scala.collection.immutable.ListMap
 
-final case class GlobalState(
+final case class AppState(
     selectedList: Option[ToDoList],
     lists: ListMap[ToDoList, ToDoListState]
 ):
     self =>
-      def reduce(event: GlobalEvent): GlobalState = event match
-          case GlobalEvent.NewList(name) =>
+      def reduce(event: AppEvent): AppState = event match
+          case AppEvent.NewList(name) =>
               if lists.exists(_._1.name == name) then self
               else
                   val newList = ToDoList(name)
@@ -16,15 +16,18 @@ final case class GlobalState(
                       selectedList = Some(newList),
                       lists = lists + (newList -> ToDoListState.initial),
                   )
-          case GlobalEvent.DeleteList(list) =>
-              copy(lists = lists - list)
-          case GlobalEvent.NewToDo(list, label, details) =>
+          case AppEvent.DeleteList(list) =>
+              copy(
+                  selectedList = if selectedList.contains(list) then lists.keys.headOption else selectedList,
+                  lists = lists - list,
+              )
+          case AppEvent.NewToDo(list, label, details) =>
               copy(lists = lists.updatedWith(list) {
                   case None => None
                   case Some(ToDoListState(toDos, doneToDos)) =>
                     Some(ToDoListState(toDos :+ ToDo(label, details), doneToDos))
               })
-          case GlobalEvent.UpdateToDo(list, index, newLabel, newDetails) =>
+          case AppEvent.UpdateToDo(list, index, newLabel, newDetails) =>
               copy(lists = lists.updatedWith(list) {
                   case None => None
                   case Some(ToDoListState(toDos, doneToDos)) =>
@@ -34,7 +37,7 @@ final case class GlobalState(
                               val updated = ToDo(newLabel.getOrElse(origLabel), newDetails.getOrElse(origDetails))
                               Some(ToDoListState(toDos.updated(index, updated), doneToDos))
               })
-          case GlobalEvent.CompleteToDo(list, index) =>
+          case AppEvent.CompleteToDo(list, index) =>
               copy(lists = lists.updatedWith(list) {
                   case None => None
                   case Some(ToDoListState(toDos, doneToDos)) =>
@@ -43,7 +46,7 @@ final case class GlobalState(
                           case Some(toDo) =>
                               Some(ToDoListState(toDos.patch(index, Nil, 1), toDo +: doneToDos))
               })
-          case GlobalEvent.RestoreToDo(list, index) =>
+          case AppEvent.RestoreToDo(list, index) =>
               copy(lists = lists.updatedWith(list) {
                   case None => None
                   case Some(ToDoListState(toDos, doneToDos)) =>
@@ -52,7 +55,7 @@ final case class GlobalState(
                           case Some(toDo) =>
                               Some(ToDoListState(toDos :+ toDo, doneToDos.patch(index, Nil, 1)))
               })
-          case GlobalEvent.DeleteToDo(list, index) =>
+          case AppEvent.DeleteToDo(list, index) =>
               copy(lists = lists.updatedWith(list) {
                   case None => None
                   case Some(ToDoListState(toDos, doneToDos)) =>
@@ -61,7 +64,7 @@ final case class GlobalState(
                           case Some(toDo) =>
                               Some(ToDoListState(toDos.patch(index, Nil, 1), doneToDos))
               })
-          case GlobalEvent.DeleteCompletedToDo(list, index) =>
+          case AppEvent.DeleteCompletedToDo(list, index) =>
               copy(lists = lists.updatedWith(list) {
                   case None => None
                   case Some(ToDoListState(toDos, doneToDos)) =>
@@ -70,35 +73,35 @@ final case class GlobalState(
                           case Some(toDo) =>
                               Some(ToDoListState(toDos, doneToDos.patch(index, Nil, 1)))
               })
-          case GlobalEvent.CompleteAll(list) =>
+          case AppEvent.CompleteAll(list) =>
               copy(lists = lists.updatedWith(list) {
                   case None => None
                   case Some(ToDoListState(toDos, doneToDos)) =>
                       Some(ToDoListState(Vector.empty, toDos ++ doneToDos))
               })
-          case GlobalEvent.ClearAllCompleted(list) =>
+          case AppEvent.ClearAllCompleted(list) =>
               copy(lists = lists.updatedWith(list) {
                   case None => None
                   case Some(ToDoListState(toDos, doneToDos)) =>
                       Some(ToDoListState(toDos, Vector.empty))
               })
-          case GlobalEvent.RestoreAll(list) =>
+          case AppEvent.RestoreAll(list) =>
               copy(lists = lists.updatedWith(list) {
                   case None => None
                   case Some(ToDoListState(toDos, doneToDos)) =>
                       Some(ToDoListState(doneToDos ++ toDos, Vector.empty))
               })
-          case todo.model.GlobalEvent.SelectList(list) =>
+          case todo.model.AppEvent.SelectList(list) =>
               copy(selectedList = Some(list))
 
-object GlobalState:
-    val initial: GlobalState = GlobalState(None, ListMap.empty)
+object AppState:
+    val initial: AppState = AppState(None, ListMap.empty)
 
 final case class ToDoList(name: String)
 
 final case class ToDoListState(
-    toDos: Vector[ToDo],
-    doneToDos: Vector[ToDo],
+                                  toDos: Vector[ToDo],
+                                  completedToDos: Vector[ToDo],
 )
 
 object ToDoListState:

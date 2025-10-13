@@ -1,61 +1,67 @@
 package todo
 
 import com.raquo.laminar.api.L.{*, given}
-import todo.model.{GlobalEvent, ToDo, ToDoList}
-import io.github.nguyenyou.webawesome.laminar.{Button, Card, Checkbox, Divider, Icon, Select, UOption}
-import util.StateContainer
+import todo.model.{AppEvent, ToDo, ToDoList}
+import common.StateContext
+import common.style.{Flex, Icon, card, customInput, makeIconButton}
 
 
+/** Displays an in-progress to-do item, with collapsible details. Displays buttons for
+  * completing and deleting item.
+  */
 object ToDoComponent:
     final case class Props(toDo: ToDo, list: ToDoList, index: Int)
 
-    enum State:
+    private enum State:
         case Collapsed, Expanded
 
-        def reduce(event: Event): State = event match {
-            case Event.Expand => State.Expanded
-            case Event.Collapse => State.Collapsed
+        def reduce(event: StateEvent): State = event match {
+            case StateEvent.Expand => State.Expanded
+            case StateEvent.Collapse => State.Collapsed
             case _ => this
         }
 
-    enum Event:
+    private enum StateEvent:
         case Complete, Delete, Expand, Collapse
 
-    def apply(propsSignal: Signal[Props])(using globalState: GlobalStore): HtmlElement =
-        val localState = StateContainer[State, Event](
+    def apply(in: Signal[Props])(using appContext: AppContext): HtmlElement =
+        // Initialize local state. Needs to be bound to the element (see below)
+        val localContext = StateContext[State, StateEvent](
             State.Collapsed,
-            (state, event) => {
-                println(s"$state <-- $event")
-                state.reduce(event)
-            },
+            (state, event) => state.reduce(event),
         )
 
-        val globalEvents = localState.events.withCurrentValueOf(propsSignal).collect:
-            case (Event.Complete, Props(_, list, index)) => GlobalEvent.CompleteToDo(list, index)
-            case (Event.Delete, Props(_, list, index)) => GlobalEvent.DeleteToDo(list, index)
+        // Collect local events that should trigger global events, and transform them
+        // accordingly. Needs to be bound to global store input (see below)
+        val globalEvents = localContext.events.withCurrentValueOf(in).collect:
+            case (StateEvent.Complete, Props(_, list, index)) => AppEvent.CompleteToDo(list, index)
+            case (StateEvent.Delete, Props(_, list, index)) => AppEvent.DeleteToDo(list, index)
 
-        Card()(
-            div(
-                className := "wa-stack",
-                div(
-                    className := "wa-split",
-                    div(
-                        className := "wa-cluster",
-                        Checkbox()(onClick.mapTo(Event.Complete) --> localState.input),
-                        strong(text <-- propsSignal.map(_._1.label)),
-                        child <-- localState.state.combineWith(propsSignal.map(_.toDo.details)).map:
+        card(
+            Flex.column(
+                Flex.row(
+                    Flex.split,
+                    Flex.row(
+                        input(`type` := "checkbox", onClick.mapTo(StateEvent.Complete) --> localContext.input),
+                        strong(text <-- in.map(_._1.label)),
+                        // Don't really worry about rendering with splitOne or anything here because
+                        // we're just rendering icon buttons
+                        child <-- localContext.state.combineWith(in.map(_.toDo.details)).map:
                             case (_, None) => emptyNode
                             case (State.Collapsed, _) =>
-                                Button(_.appearance.plain)(Icon(_.name := "chevron-right", _.label := "expand")(), onClick.mapTo(Event.Expand) --> localState.input)
+                                Icon.collapsed(makeIconButton, onClick.mapTo(StateEvent.Expand) --> localContext.input)
                             case (State.Expanded, _) =>
-                                Button(_.appearance.plain)(Icon(_.name := "chevron-down", _.label := "collapse")(), onClick.mapTo(Event.Collapse) --> localState.input),
+                                Icon.expanded(makeIconButton, onClick.mapTo(StateEvent.Collapse) --> localContext.input)
                     ),
-                    Button(_.appearance.plain)(Icon(_.name := "xmark", _.label := "close")(), onClick.mapTo(Event.Delete) --> localState.input),
+                    Icon.close(makeIconButton, onClick.mapTo(StateEvent.Delete) --> localContext.input)
                 ),
-                child.maybe <-- propsSignal.combineWith(localState.state).map:
+                // Don't worry about rendering here because it's just text (no internal state)
+                child.maybe <-- in.combineWith(localContext.state).map:
                     case (Props(ToDo(_, Some(details)), _, _), State.Expanded) => Some(div(details))
                     case _ => None
             ),
-            localState.bind,
-            globalEvents --> globalState.input,
+
+            // Bind events
+            globalEvents --> appContext.input,
+            localContext.bind,
         )

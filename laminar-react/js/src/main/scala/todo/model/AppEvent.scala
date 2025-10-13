@@ -1,6 +1,6 @@
 package todo.model
 
-enum GlobalEvent:
+enum AppEvent:
     case SelectList(list: ToDoList)
     case NewList(name: String)
     case DeleteList(list: ToDoList)

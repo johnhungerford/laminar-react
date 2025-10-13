@@ -9,7 +9,7 @@ Do you have front-end experience using React and some familiarity with Scala? Ar
 
 If you are already familiar with Laminar skip to ["The react model in Laminar"](#the-react-model-in-laminar) or ["Simpler splitting"](#simpler-splitting) to learn about how to render elements conditionally in an ergonomic way. Also feel free to just [skip to the code](laminar-react/js/src/main/scala/).
 
-## Introduction
+## Background
 
 It's no secret that Javascript is unsuitable for the scale it has reached. TypeScript too, while a huge improvement on JS, sticks too close to Javascript to take advantage of many features that are gaining traction in modern programming languages. It was therefore a great relief to me as a Scala developer when a few years ago I had the option of using [Scala.js](https://www.scala-js.org/) as a browser language for a front-end task that had fallen in my lap. I was not disappointed in the results of that choice. Ever since that first opportunity, I have consistently found Scala.js to be a far more productive for web development than its alternatives. As time went on, moreover, the trade-offs this choice demands (which were substantial at first) have steadily diminished. Bundle sizes have consistently shrunk (and bundle-splitting is now supported), compilation times have shortened, and tooling has improved dramatically. By this point, Scala.js has the footprint of a framework like React and is absolutely useable as a production solution.
 
@@ -22,7 +22,7 @@ For these reasons I was really excited when [Laminar](https://laminar.dev/) was 
 
 When a new opportunity to do some web-development in Scala came up more recently, therefore, I decided to use Laminar and ditch React entirely. This experience eventually led to great results, but I admit it took me a while to work out how to get laminar to do what I wanted. It is a fairly unopinionated library, and there a lot of ways to go wrong using it. It also took me a while to come to grips with the implications of its significant differences with React. After some effort, however, I worked out a way to get Laminar working for me better than scalajs-react ever did. Moreover, I did so without having to throw out the mental model I had inherited from React.
 
-In this article I will share with you what I learned from this experience: I will provide an introduction to Laminar, show how Laminar departs from React and the challenges that this presents, and then show you my solution to these challenges. At the end, I will sketch a suggested application architecture. For a more complete example application, you can look at the [accompanying code](laminar-react/js/src/main/scala/App.scala), where you can also find (and run!) all the code in this article (see the [README](README.md) for instructions on running the code).
+In this article I will share with you what I learned from this experience: I will provide a brief introduction to Laminar, and then provide a series of formulas for translating different kinds of React components to Laminar components. All of the examples discussed here are included in this repository and can be run locally in a browser. See the [README](README.md) for instructions on building and running the code. At the end the article, I will sketch a suggested application architecture. For a more complete example application, you can look at the [example To-Do application](laminar-react/js/src/main/scala/todo/AppComponent.scala) including in this repository, which you can also run. The README includes instructions on running a hot-reloading dev server, so you can play around with the code and see how it changes the behavior in the browser.
 
 ## Laminar
 
@@ -52,536 +52,794 @@ render(
 ```
 
 
-As the above example illustrates, elements are constructed declaratively using functions named after their corresponding tags. These functions accept child elements, property settings, and event handlers as arguments. Property settings are defined using `:=` for static values and `<--` for reactive data. Setting properties using a reactive value like `Signal` or `EventStream` will ensure that the property is updated with each new value. Event handlers are constructed using `-->`, which pipes an event listener (e.g., `onClick` or `onChange`) into a reactive `Observer`.
+As the above example illustrates, elements are constructed declaratively using functions named after their corresponding tags. These functions accept child elements, property settings, and event handlers as arguments. Property settings are defined using `:=` for static values and `<--` for reactive data. Setting properties using a reactive value like `Signal` or `EventStream` will ensure that the property is updated with each new value. DOM event handlers are constructed using `-->`, which pipes an event property (e.g., `onClick` or `onChange`) into a reactive `Observer`.
 
-Scala's powerful type system and expressive functional syntax makes it easy to *safely* pipe data between reactive elements of various types. For instance, in the above example the reactive `Var` `nameState` exposes an `Observer` via `textState.writer` which accepts `String` inputs, whereas the event listener `onClick` represents a stream of `MouseEvent`s. The method `mapToValue` transforms this to a stream `String`s by extracting the input value from each event (it is equivalent to `textState.map(_.currentTarget.value))`). Now that it matches the observer's type, it can be bound to it using `-->`.
+Scala's powerful type system and expressive functional syntax makes it easy to *safely* pipe data between reactive elements of various types. For instance, in the above example the reactive `Var` `nameState` exposes an `Observer` via `textState.writer` which accepts `String` inputs, whereas the event property `onInput` provides a stream of `Event`s. The method `mapToValue` transforms this to a stream `String`s by extracting the input value from each event (it is equivalent to `onInput.map(_.currentTarget.value))`). Now that it matches the observer's type, it can be bound to it using `-->`.
 
-While these features can be used to construct elements and update their properties in response to DOM events, they do not yet indicate how to render elements conditionally. What if you need to render an `input` or a `select` element depending on your application state? To accomplish this, Laminar allows you to bind signals or streams containing elements using the `child` (for single elements) and `children` (for collections of elements) properties. This can be used to render a signal conditionally:
+## General principles
 
-*[laminar-react/js/src/main/scala/article/Example1Naive.scala](laminar-react/js/src/main/scala/article/Example1Naive.scala)*
-```scala
-import com.raquo.Laminar.api.L.{*, given}
+The remainder of this article will try to demonstrate, through a series of examples, how to translate React patterns to Laminar. The approach sketched here is a fairly opinionated one. I strongly recommend it for new users, but there are other perfectly valid ways of structuring Laminar applications. There are some parts of my approach, however, that I would like to call out in advance as non-optional. It will save you a lot of trouble to get used to these three principles early on:
 
-enum InputType:
-    case SelectionInput(selectedValue: Option[Boolean])
-    case TextInput(textValue: String)
+### 1. Data should always much always be reactive
 
-final case class State(inputType: Option[InputType])
+In React, we are used to defining our components as functions from properties to elements. In Laminar, components are functions from `Signal`s of properties to elements. This makes things challenging at first, and it can often be tempting to try to skip the reactive types and render elements directly from their static properties. It is possible to do so in many cases, because you can map reactive state to rendered elements and bind them as children to parent nodes as follows:
 
-val state = Var(State(None))
-
-val element = div(
-    select(
-        option(
-            "Choose input type",
-            value := "none",
-        ),
-        option(
-            "Select",
-            value := "select",
-        ),
-        option(
-            "Text",
-            value := "text",
-        ),
-        value := "none",
-        onChange.mapToValue --> Observer[String] {
-            case "none" => state.set(State(None))
-            case "select" => state.set(State(Some(InputType.SelectionInput(None))))
-            case "text" => state.set(State(Some(InputType.TextInput(""))))
-        },
-    ),
-    child <-- state.signal.map {
-        case State(None) => div()
-        case State(Some(InputType.SelectionInput(selection))) =>
-            select(
-                option(
-                    "No selection",
-                    value := "none",
-                ),
-                option(
-                    "True",
-                    value := "true",
-                ),
-                option(
-                    "False",
-                    value := "false",
-                ),
-                value := (selection match {
-                    case None => "none"
-                    case Some(true) => "true"
-                    case Some(false) => "false"
-                }),
-                onChange.mapToValue --> Observer[String] {
-                    case "none" => state.set(State(Some(InputType.SelectionInput(None))))
-                    case "true" => state.set(State(Some(InputType.SelectionInput(Some(true)))))
-                    case "false" => state.set(State(Some(InputType.SelectionInput(Some(false)))))
-                },
-            )
-        case State(Some(InputType.TextInput(textValue))) =>
-            input(
-                value := textValue,
-                onInput.mapToValue --> Observer[String](newValue => state.set(State(Some(InputType.TextInput(newValue))))),
-            )
-
-    },
-)
-```
-
-In the above example, the first `select` element chooses the input type, and the next `child` "receiver" is bound to an element rendered from the current state. (Scala's support for pattern matching makes conditional rendering from state much more elegant than in Javascript frameworks.)
-
-## Laminar vs React
-
-The above example seems to imply a straight-forward correspondance between Laminar's reactive model and React's functional component model. All of the pieces are in place to translate a react application to Laminar: store the state in `Var`, map the state's `signal` to conditionally render each component, and pipe event listeners to `Observer` callbacks that update the state.
-
-This apparent similarity overlooks an important feature of react that is missing from Laminar. What's missing will become clear once we run the example. (See the [readme](README.md) to run the examples; the above code block is called "Conditional Rendering: Naive".) Rendered in the browser, everything works fine until we select `Text` from the input selector. This renders a text input, into which we can begin typing some text. The first character we type appears in the input box, but the next characters do not! For some reason, after we type the first character the input element immediately loses focus. We can click on the input to try typing again, but the same thing happens. Every time we type a character we need to click the input box again. What's going on?
-
-The answer is simple: every time we change the input, it updates the state and *the entire element is rerendered*. Each time this happens, the focus is lost. While this particular problem could be fixed by configuring the input to be focused on each render, the bigger issue is that elements are being rerendered when they shouldn't be. In fact, every single element within the reactive `child` will be rerendered with every change of state. This is going to produce a lot of different issues as our application grows in complexity. How can this be avoided?
-
-In React, this is a problem we don't have to think about very often. The reason is that React components do not render elements directly. Instead, they construct what is called a "virtual DOM" -- a parallel data-only image of the DOM. Every change of state fully regenerates the virtual DOM, but instead of rendering the whole thing, React compares it with its previous version and only updates those parts of it that have changed. This approach is very powerful -- it means we rarely have to think about when to render an element or not.
-
-While powerful, the React approach is also a bit overkill. In order to make reliable rendering decisions, it needs to maintain an entire reconstruction of the DOM in memory. It also needs to undertake an elaborate "diffing" process after every change of the application state to decide what gets rendered and what doesn't. The overhead needed for this is not negligible.
-
-Laminar's reactive data is a much more efficient mechanism for propagating updates. The cost, however, is more mental energy devoted to optimizing rendering. This cost can be very high for newcomers to Laminar -- especially for those coming from React. There are different ways to design around the rendering problem, and it is easy to come up with bad and confusing solutions. These solutions can often give up a lot of the important benefits of the React mental model, which is to think of your application as a simple function from state to view. It is not necessary to abandon the React model, however! The remainder of this article will try to show how React's mental model can be optimally approximated within Laminar so that the developer can gain the benefits of Laminar's reactive approach along with benefits of React's architectural simplicity.
-
-## The React model in Laminar
-
-To begin with, let's clarify what we mean by the "React mental model." What I mean by this is thinking of our application as a pure function from state to view. We do not want to have to hand-wiring all the various updates, and we do not want to have to think about when each update will actually be made. We want that to be generally taken care of for us, and we want to just render elements directly based on state and/or properties.
-
-We can assume that state (and properties) will always be propagated throughout the application in the form of a `Signal`. The basic problem, then, is how to "choose" between cases of the data delivered in a signal, and render an element *a single time for each of those cases*.
-
-Laminar has part of a solution out-of-the-box with the `Signal#splitOne` method. `splitOne` requires you to (1) generate a "key" for each value produced by your signal, and (2) render an element using the original signal. The rendering function provided in (2) will only be called once throughout any series of signal updates in which the key generated by (1) has not changed. This addresses the basic rendering problem. We can update our original application as follows:
-
-*[laminar-react/js/src/main/scala/article/Example2SplitOne.scala](laminar-react/js/src/main/scala/article/Example2SplitOne.scala)*
-```scala
-val element = div(
-    ... // Select element
-    child <-- state.signal.splitOne({
-        case State(None) => 0
-        case State(Some(InputType.SelectionInput(_))) => 1
-        case State(Some(InputType.TextInput(_))) => 2
-    }) {
-        case (_, State(None), _) => div()
-        case (_, State(Some(InputType.SelectionInput(_))), signal) =>
-            select(
-                option(
-                    "No selection",
-                    value := "none",
-                ),
-                option(
-                    "True",
-                    value := "true",
-                ),
-                option(
-                    "False",
-                    value := "false",
-                ),
-                value <-- (signal.map {
-                    case State(Some(InputType.SelectionInput(Some(true)))) => "true"
-                    case State(Some(InputType.SelectionInput(Some(false)))) => "false"
-                    case _ => "none"
-                }),
-                onChange.mapToValue --> Observer[String] {
-                    case "none" => state.set(State(Some(InputType.SelectionInput(None))))
-                    case "true" => state.set(State(Some(InputType.SelectionInput(Some(true)))))
-                    case "false" => state.set(State(Some(InputType.SelectionInput(Some(false)))))
-                },
-            )
-        case (_, State(Some(InputType.TextInput(_))), signal) =>
-            input(
-                value <-- signal.map {
-                    case State(Some(InputType.TextInput(textValue))) => textValue
-                    case _ => ""
-                },
-                onInput.mapToValue --> Observer[String](
-                    newValue => state.set(State(Some(InputType.TextInput(newValue))))
-                ),
-            )
-    },
-)
-```
-
-This updated version now generates an integer key for each of the three main cases of the state (0, 1, or 2), ensuring that the subsequent render function will not be re-executed until the state leaves that case. The render function then matches again on the *original* value of the state when a given key value is first encountered (the render function for `splitOne` takes three parameters: the key, the original signal value, and the signal itself) to determine which way to render.
-
-While this does solve the basic rendering problem, which we can confirm running the updates in our browser, we immediately see some issues with the code. It requires a fair amount of boilerplate and includes some undesirable redundancy. For instance, we have to match on the *full state* in *four* places! First, when we generate the key; second, for conditional rendering; third, when mapping the state signal to the `select` value; and fourth, when mapping the state signal to the text input value. It's fair to say this does not enter the ball-park of React's conceptual simplicity.
-
-## Simpler splitting
-
-How can this be better? What we'd really like to do is to narrow our state down to the individual cases we'd like to render, and then render each of those cases using a signal of that narrowed state, ignoring state updates that are not relevant to the current case. To accomplish this using the existing `splitOne` method, we'll have to provide a separate matching function and rendering function for each case. We can accumulate these cases, which we'll call "routes" and then generate a signal at the end using `splitOne`. The API should look like this:
-
-```scala
-enum State:
-	case Case1(int: Int)
-	case Case2(str: String)
-
-val stateSignal: Signal[State] = ???
-
-val routedSignal: Signal[HtmlElement] = stateSignal
-	.routeSignal({ case State.Case1(value) => value }) { (case1Signal: Signal[Int]) =>
-		div("Case 1!", height <-- case1Signal)
-	}
-	.routeSignal({ case State.Case2(value) => value }) { (case2Signal: Signal[String]) =>
-		div(text <-- case1Signal.map(txt => s"Case 2!: $txt"))
-	}
-	.result
-```
-
-This approach looks pretty close to a simple pattern match, while still propagating state in a signal. Now, however, the propagated signal is narrowed down to the subtype as determined by the matching function for each route.
-
-Implementing this API is not too difficult. The full implementation is as follows:
-
-*[laminar-react/js/src/main/scala/util/SignalRouter.scala](laminar-react/js/src/main/scala/util/SignalRouter.scala)*
-```scala
-case class SignalRoute[A, B, +C](select: PartialFunction[A, B], map: Signal[B] => C)
-
-sealed case class SignalRouter[A, +C](signal: Signal[A], routes: Vector[SignalRoute[A, ?, C]]):
-    private def selectPartial[B](select: PartialFunction[A, Any], result: B): PartialFunction[A, B] = {
-        case (a: A) if select.isDefinedAt(a) => result
-    }
-
-    private def splitFn[C1 >: C](default: Signal[A] => C1): A => (Int | Unit) =
-        val indexedRoutes = routes.zipWithIndex
-        indexedRoutes.headOption match
-            case None => _ => ()
-            case Some((SignalRoute(select, _), i)) =>
-                indexedRoutes.tail.foldLeft(selectPartial(select, i)) {
-                    case (pf, (SignalRoute(select, _), i)) =>
-                        pf.orElse(selectPartial(select, i))
-                }.orElse({ case _ => () })
-
-    def result[C1 >: C](default: Signal[A] => C1): Signal[C1] = signal.splitOne(splitFn(default)):
-        case ((), _, splitSignal) =>
-            default(splitSignal)
-        case (i: Int, _, splitSignal) =>
-            val route = routes(i)
-            val typedSignal = splitSignal.map(route.select).distinct
-            route.map(typedSignal)
-
-    def result[C1 >: C](default: C1): Signal[C1] = result[C1](_ => default)
-
-    def result[C1 >: C]: Signal[C1] = result(_ => throw IllegalStateException("Unmatched signal route!"))
-
-    def routeSignal[B](select: PartialFunction[A, B])[C1 >: C](map: Signal[B] => C1): SignalRouter[A, C1] =
-        copy[A, C1](routes = routes.appended(SignalRoute[A, B, C1](select, map)))
-
-// Provide an extension method to start routing directly from a signal
-extension [A](signal: Signal[A])
-    def routeSignal[B](select: PartialFunction[A, B])[C](map: Signal[B] => C): SignalRouter[A, C] =
-        SignalRouter(signal, Vector(SignalRoute(select, map)))
-```
-
-Each route is modeled as a `SignalRoute` consisting of a partial function "select" and a render function "map". These `SignalRoute`s are collected in `SignalRouter`, which generates the resulting signal by composing all the "select"s into a single key function and composing all the "map"s (each using its corresponding "select" function to narrow down the signal) into a single render function. 
-
-Now that we have a more straightforward way of routing our signal, let's update our original application:
-
-*[laminar-react/js/src/main/scala/article/Example3RouteSignal.scala](laminar-react/js/src/main/scala/article/Example3RouteSignal.scala)*
-```scala
-val element = div(
-    ...  // Select element
-    child <-- state.signal
-        .routeSignal({
-            case State(None) => ()
-        }) { _ =>
-            div()
-        }
-        .routeSignal({
-            case State(Some(selectState @ InputType.SelectionInput(_))) => selectState
-        }) { selectStateSignal =>
-            select(
-                option(
-                    "No selection",
-                    value := "none",
-                ),
-                option(
-                    "True",
-                    value := "true",
-                ),
-                option(
-                    "False",
-                    value := "false",
-                ),
-                value <-- selectStateSignal.map {
-                    case InputType.SelectionInput(None) => "none"
-                    case InputType.SelectionInput(Some(true)) => "true"
-                    case InputType.SelectionInput(Some(false)) => "false"
-                },
-                onChange.mapToValue --> Observer[String] {
-                    case "none" => state.set(State(Some(InputType.SelectionInput(None))))
-                    case "true" => state.set(State(Some(InputType.SelectionInput(Some(true)))))
-                    case "false" => state.set(State(Some(InputType.SelectionInput(Some(false)))))
-                },
-            )
-        }
-        .routeSignal({
-            case State(Some(textState@InputType.TextInput(_))) => textState
-        }) { textStateSignal =>
-            input(
-                value <-- textStateSignal.map(_.textValue),
-                onInput.mapToValue --> Observer[String](
-                    newValue => state.set(State(Some(InputType.TextInput(newValue))))
-                ),
-            )
-        }
-        .result,
-    padding := "20px",
-)
-```
-
-This new approach solves the rendering problem while keeping as closely as possible to the React approach. It is still not perfect. For instance, breaking up the match cases into separate routes makes it impossible for the compiler to validate the completeness of our matches. If we add another case to our `State` enum, the compiler will not warn us, and the application will fail with a `MatchError` as soon as that new case is reached. If we accidentally make one match case too broad, the compiler will not warn us of "unreachable" cases. Despite this inconvenience, it is the best approximation of React-style conditional rendering I have been able to achieve using Laminar.
-
-## Other tricks
-
-### Update on changes only
-
-While our `SignalRouter` utility solves the main rendering problem, there is still the issue that any properties we have bound to our state signal will be updated each time the signal emits a new value, even if the value hasn't changed. This can lead to a fair amount of unnecessary updates. To avoid this problem, Laminar provides a `Signal#distinct` method to generate a new signal that only emits values when the original signal emits a value different from the last one. This is sort of the Laminar equivalent of React's "diffing" the virtual DOM.
-
-### Reactive element arrays
-
-Though `routeSignal` solves the rendering issue for single elements, anyone who has used React is familiar with a similar problem for arrays of elements. Any time a sequence of elements is generated from a collection via `map`, some step must be taken to ensure that each mapped element is not rerendered each time. To address this issue, we can use Laminar's own `Signal#split` method without needing to customize it at all.
-
-`split` works a lot like the React approach, which is to assign a key to each element in the array so that React knows which element to compare it to from the previous rendering. Like `splitOne`, `split` requires you to map the elements of a signal (it can only be called on a `Signal` of a collection type) to a key prior to rendering. The rendering function will not be re-executed for any element emitted if its key was generated in the last rendering -- even if it is at a different place in the collection. Here is what `.split` looks like in a Laminar application:
-
-*[laminar-react/js/src/main/scala/article/Example4SplitArray.scala](laminar-react/js/src/main/scala/article/Example4SplitArray.scala)*
-```scala
-case class Person(name: String, age: Int)
-
-val state = Var(Vector(Person("John", 41), Person("Angie", 52), Person("Derek", 28), Person("Sharon", 78)))
-
-val element = ul(
-    children <-- state.signal.split(_.name) { (_, _, signal) =>
-        li(
-            text <-- signal.map(v => s"${v.name}: ${v.age} years old").distinct,
-            input(`type` := "checkbox", marginLeft := "10px"),
-        )
-    },
-    ul(
-        button("reverse", onClick --> Observer[Any](_ => state.update(_.reverse))),
-        marginTop := "15px",
-    )
-)
-```
-
-In the above example, rearranging the list of people will not rerender any of the individual list items. For instance, if you select any of the checkboxes and then click the "reverse" button, the selection will remain (since the checkbox's state is not controlled, rerendering would clear the selection).
-
-### Manipulating signals
-
-It should be clear by now that a laminar application needs to propagate all of its state in the form reactive types like `Signal` in order to render properly. This means you have to get comfortable using these types. It can be a challenge at first figuring out how to access the data you need for each property or even handler. Here are the three basic kinds of transformations you should get comfortable with:
-
-#### Selecting parts of a signal
-
-We have already seen a number of examples of this, but it's worth calling attention to. If you have a signal of some complicated object, say `State(value1: String, value2: Boolean, value3: Int)`, and you want to use just one of the three properties, say `value1` to set the text in a element, use the `map` function:
-
-```scala
-val signal: Signal[State] = ???
-
+```scala 3
 div(
-    text <-- signal.map(_.value1)
+    child <-- someSignal.map(value => renderFromValue(value))
 )
 ```
 
-#### Combining signals
+This should be avoided! The reason we are able to render directly from properties in React is our rendering functions don't actually render anything. Instead, they construct a *virtual* DOM. By comparing the virtual DOM before and after each change of state, React determines what has changed and propagates those changes to the actual DOM. This way it does not render anything more than needs to be rendered. In Laminar, there is no virtual DOM, no diffing, and no such automated help in deciding what to render. The above example, for instance, will call `renderFromValue` any time `someSignal` is updated (even if the value doesn't change!) and will reconstruct from scratch whatever element it produces.
 
-A common pattern in React applications is to have components with both *properties* and *local state*. In a laminar application, these will both need to be accessed in the form of `Signal`s (or other similar types, like `EventStream`). It is not uncommon that you'll have to set properties based on some combination of the data in each of these signals. To allow this, Airstream provides a menu of combinators on the various types to combine them. `Signal#combineWith` allows you to combine two or more signals, and `EventStream#withCurrentValueOf` allows you to combine a stream with one or more `Signal`s. These will generate reactive streams of *tuples* of the original streams.
+This distinction between React and Laminar has a number of important consequences, but the first that you need to learn is to get comfortable passing around reactive data types for just about everything. If you find yourself handling properties or state without it wrapped in a `Signal` wrapper, you're likely doing something wrong.
 
-Here is what it looks like to use two data streams in a laminar component:
+### 2. Think about rendering
 
-*[laminar-react/js/src/main/scala/article/Example5CombineSignals.scala](laminar-react/js/src/main/scala/article/Example5CombineSignals.scala)*
-```scala
-// A component that receive some word to display, and maintains its own state
-// determining how many times to display it
-object RepeatComponent:
-    final case class State(numRepetitions: Int)
+To generalize the above point: get used to thinking about rendering. React encourages you not to think about it. Indeed, this is the great value proposition of React, that it abstracts from the problem of rendering. The good news is that there are really only a couple of basic patterns dealing with rendering issues that can be learned quickly. We will go over these patterns in some of the examples below. Once you're comfortable with them, you will actually find Laminar to be safer than React since it is much clearer where rendering issues will arise and because you have much more control over rendering.
 
-    final case class Props(word: String)
+### 2. Events over callbacks
 
-    def apply(props: Signal[Props]) =
-        // State is reset on ever render
-        val state = Var(State(1))
+In React, we handle events via callbacks, calling functions like `setState` and `dispatch` that may also log and execute any number of other side-effects. It is possible to use this approach with Laminar, since event props like `onClick` and `onChange` can be bound to callbacks, e.g.:
 
-        // For things like click events we can make updaters that don't care about the event type
-        val increaser = state.updater[Any]:
-            case (State(n), _) => State(n + 1)
+```scala 3
+val state = Var[Boolean](true)
 
-        val decreaser = state.updater[Any]:
-            case (State(n), _) => State((n - 1).max(1))
+button(
+    "Click me!",
+    onClick --> { evt =>
+        println("Hello world!")
+        state.update(!_)
+    }
+)
+```
 
-        // Combine `word` from `props` with `numRepetitions` from `state.signal`
-        val repeatedWord = props.combineWith(state.signal).map:
-            case (Props(word), State(numReps)) => List.fill(numReps)(word).mkString(", ")
+The above is perfectly valid Laminar code, but you should avoid it. Instead, try the following:
 
+```scala 3
+val state = Var[Boolean](true)
+val stateFlipper = state.updater[Any]((current, _) => !current)
+
+button(
+    "Click me!",
+    onClick.tapEach(_ => println("Hello world")) --> stateFlipper,
+)
+```
+
+What was wrong with the callback? After all, the second version looks like a more complicated version of the first. To be sure it is! The problem never appears in the simple cases. The problem is that once you start to construct your elements with a callback style, you end up missing out on Laminar's power when -- as your application scales -- it becomes really useful.
+
+So what's the advantage of separating the `println("Hello World!")` statement from the state update? For one thing, it allows you to reuse `stateFlipper` without including that logging. `tapEach`, for its part, is explicit about the fact that it is *only* doing a side-effect. `onClick.map` could transform the `MouseEvent` value, but `.tapEach` will necessarily leave the event unchanged. It thus provides some clarity and safety.
+
+More importantlly, in my view, by designing your application logic around event streams ran than side-effecting processes, you will be able to do more. The `tapEach` and `stateFlipper` "sections" of the little mouse click handling pipeline that we're constructing can be more easily pulled apart, reused, and combined in various interesting ways. Laminar's reactive combinators are powerful and flexible, and can do a ton of cool things. If you stick too closely to React approach, you're going to miss out on a lot.
+
+## Translating React components
+
+Let's start with a simple functional React component. In Javascript or TypeScript this is going to look
+something like the following:
+
+```typescript
+type ComponentNameProps = {
+    value1: string,
+    value2: number,
+    ...
+}
+
+function ComponentName(props: ComponentNameProps) {
+    return <div>
+        ...
+    </div>
+}
+```
+
+In Laminar, we'll do essentially the same thing: each component will be a function of some inputs that will return an `HtmlElement`, a Laminar representation of a DOM element. Instead of defining this function as `def ComponentName(...): HtmlElement`, however, let's construct it as follows:
+
+```scala 3
+import com.raquo.laminar.api.L.{*, given}
+
+object ComponentName:
+    def apply(...): HtmlElement =
         div(
-            h3(text <-- repeatedWord),
-            button("Repeat more!", onClick --> increaser),
-            button("Repeat less!", onClick --> decreaser),
+          ...
+        )
+```
+
+This is simply a more explicit (and verbose) way of defining `ComponentName` as a function object by overriding the `apply` method explicitly. The advantage of constructing it this way is that you can use the object `ComponentName` as a namespace for any type definitions or other utilities needed for it. For instance, you can define `Props` and/or `State` data types to model your inputs and state.
+
+### Simple presentation components
+
+Before we start defining typed inputs for our components analogous to those typically seen in React components, however, we should consider whether we really need to. For simple presentation components, I have found it makes more sense simply to reuse the existing Laminar API.
+
+Consider, for instance, the `Stack` component from the [material-ui](https://mui.com/material-ui/) React library. This abstraction of the flex-box API has a lot of custom properties you can configure. Instead of adding a bunch of properties to our component, however, we can just do the following to add custom flex-styled components:
+
+[laminar-react/js/src/main/scala/common/style/package.scala](laminar-react/js/src/main/scala/common/style/package.scala)
+```scala 3
+import com.raquo.laminar.api.L.{*, given}
+
+object Flex:
+    def column(modifiers: Modifier[HtmlElement]*): HtmlElement =
+        div(
+            display.flex,
+            flexDirection.column,
+            gap := "20px",
+            alignItems := "stretch",
+            cluster,
+            modifiers,
         )
 
+    def row(modifiers: Modifier[HtmlElement]*): HtmlElement =
+        div(
+            display.flex,
+            flexDirection.row,
+            gap := "20px",
+            alignItems := "center",
+            cluster,
+            modifiers,
+        )
 
-// Top-level element that constructs the word and passes
-// it down to RepeatComponent
-final case class State(inputText: String)
+    val cluster: Modifier[HtmlElement] = Seq(
+        justifyContent := "flex-start"
+    )
 
-val element = 
-    val state = Var(State(""))
-    
-    div(
-        input(
-            value <-- state.signal.map(_.inputText),
-            onInput.mapToValue.map(txt => State(txt)) --> state.writer,
-        ),
-        RepeatComponent(state.signal.map(state => RepeatComponent.Props(state.inputText.strip()))),
+    val split: Modifier[HtmlElement] = Seq(
+        justifyContent := "space-between"
     )
 ```
 
-#### Accessing state/props when handling events
+`row` and `column` just take the usual modifiers and pass them along to the `div` element. They just add a few custom modifiers first for default configuration. Note that by putting `modifiers` last in the list, the user is able to override any of them. These two methods provide simple utilities to generate a `Stack`-like component that can be easily customized.
 
-In React applications, event handlers are typically constructed as callbacks. Within these callbacks it is always simple to graph the current value of the component properties or state. In Laminar, event handlers are typically constructed as data pipelines; moreover, it is not possible to just lookup the current value of a stream of state. Instead, you have to *compose* the event source or the event handler with any signals you want to use.
+`cluster` and `split` for their parts are modifiers that can be added to `Flex.column` or `Flex.row` (or any other element) to customize them further. These are very simple to define as sequences of modifiers, which Laminar will implicitly convert to the `Modifier` type.
 
-This can be done in a few different ways depending on the reactive data types you happen to be using, but I have found the way to accomplish it most consistently is to compose your signals on the *source* using `EventProp#compose`. `EventProp` is the type of any element event listeners to which you can bind handlers. `onClick`, for instance, is an `EventProp[MouseEvent]`. The `compose` method allows you to access and transform the underlying event stream. You can call `withCurrentValueOf` to combine that stream with any signals to transform it into the required event type.
+Note that instead of using the `apply` method for `row` and `column`, I give these methods their own names. I have found this a useful convention: lower-case functions for "tag"-like components, defined within a namespace (e.g. the `Flex` object above) that includes any options (`Modifier`s) that can be applied to them. These can either be imported from the namespace, or the namespace can be imported to avoid name collisions and assist with discoverability.
 
-*[laminar-react/js/src/main/scala/article/Example6HandleWithSignal.scala](laminar-react/js/src/main/scala/article/Example6HandleWithSignal.scala)*
-```scala
-final case class Person(name: String, age: Int)
+I have found handling styling through this type of component abstraction far more productive than trying to abstract all the specific properties I think the component should support. While it is not as precisely typed as we Scala developers may like, it's much easier to extend (which you have to do a lot with styles). By simply adding variants of the modifiers that can be mixed in (like `cluster` and `split`), you can add options to your styles without really having to change anything else.
 
-object PersonDisplay:
-    final case class Props(person: Person, index: Int)
+You can find more examples of custom presentation components in the [styles package](laminar-react/js/src/main/scala/common/style/package.scala). These components will be used consistently in the all of the examples in the rest of the article, so it's worth spending a few minutes getting acquainted with them. Note that the styling also depends on css styles included in the bundle. You can find [the stylesheet in the jsbundler directory](laminar-react/js/jsbundler/styles.css).
 
-    def apply(props: Signal[Props], handleRemove: Sink[Int]) =
-        // Note this will have a kind of crazy type LockedEventKey[MouseEvent, MouseEvent, Int],
-        // but you can think of it as equivalent to `EventProp[Int]`
-        val onClickMappedToIndex = onClick.compose(
-            _.withCurrentValueOf(props).map:
-                case (_, Props(_, index)) => index
-        )
+### Data in and data out
 
-        div(
-            text <-- props.map(p => s"${p.person.name}: ${p.person.age} years old"),
-            button(
-                "Remove",
-                marginLeft := "10px",
-                onClickMappedToIndex --> handleRemove,
+When you start designing components connected with the domain of your application, or presentation components with more narrowly defined behavior, it makes sense to start defining your components' inputs and outputs with precise types rather than using `Modifier` parameters.
+
+#### 1. Stateless component
+
+The simplest case of an explicitly typed Laminar component is a stateless and eventless component. Consider a component whose purpose is only to display a header and text:
+
+```scala 3
+import com.raquo.laminar.api.L.{*, given}
+
+object StatelessInput:
+    final case class Props(
+        header: String,
+        body: String,
+    )
+
+    def apply(in: Signal[Props]): HtmlElement =
+        Flex.column(
+            h1(
+              text <-- input.map(_.header),
+            ),
+            p(
+              text <-- input.map(_.body),
             )
         )
+```
 
-final case class State(people: Vector[Person])
+In the above example, `Props` describes all the data that the `StatelessInput` component will render. The component is then defined as a function of a `Signal[Props]`, which is then piped into the appropriate DOM properties.
 
-val element =
-    val initialState = State(Vector(Person("John", 41), Person("Ian", 42), Person("Aaron", 30)))
-    val state = Var(initialState)
+The alternative is to split the properties into separate signals that can each be an argument. This would look like the following:
 
-    val removePersonAtIndex: Sink[Int] = state.updater[Int]:
-        case (State(people), index) =>
-            State(people.patch(index, Nil, 1)) // Scala's funny way of removing an element
+```scala 3
+...
+    def apply(header: Signal[String], body: Signal[String]): HtmlElement =
+        ...
+```
 
-    div(
-        button("Reset", onClick --> state.updater[Any]((_, _) => initialState)),
-        ul(
-            marginTop := "10px",
-            children <-- state.signal.map(_.people.zipWithIndex).split(_._1.name):
-                case (_, _, personSignal) =>
-                    PersonDisplay(
-                        personSignal.map(tuple => PersonDisplay.Props(tuple._1, tuple._2)),
-                        removePersonAtIndex,
-                    )
-        ),
+In a lot of cases this would work just as well (in some cases even better), but I have found that in general it's better to include all required data in a single type. There are several reasons for this. First, while it is quite simple to *select* data from a signal of case class using `.map(_.propertyName)`, it is not as simple to combine signals, which you will often have to do if you segregate your data streams. To do this you have to use `signal1.combineWith(signal2)` which generates a signal of a tuple of both. Tuples are much more awkward to deal with than case case classes. 
+
+Most importantly, however, sticking with a single signal as your input will make it easier to adapt to more complicated data models. `Props` can be easily converted to an `enum` when you realize your component's state has different modes with different properties (which is often the case). It is easier to model your components more reasonably when you start out with consolidated inputs.
+
+One final note: I have used `in` as the name of the props signal parameter. I have found this a useful convention (`input` is the name of a tag, so avoid that). While it is not super important what name you choose, I encourage you to be consistent. Applications and individual components quickly get complicated, and it makes everyone's lives easier when the can depend on regular conventions across the codebase. By using the same parameter name (`in`) and the same type name (`Props`), it is very easy for a newcomer to get an idea of what's going on in each component.
+
+
+#### 2. Controlled stateless component
+
+We have seen the simple case where we have a component with data coming into it in the form of `Props`. That component was not interactive, however, which is to say it didn't expose any events for its parent to handle. What would an interactive component look like? The typical pattern for a data-in/data-out component is one with "controlled" properties. It does not have its own state, but it allows its parent to set a value and then also handle events indicating a change in that value. The example below provides a simple example of this, with a controlled text input:
+
+[laminar-react/js/src/main/scala/article/Example2StatelessInputOutput.scala](laminar-react/js/src/main/scala/article/Example2StatelessInputOutput.scala)
+```scala 3
+object StatelessInputOutput:
+    final case class Props(
+        value: String,
     )
+
+    enum Event:
+        case ChangeValue(newValue: String)
+        case SubmitValue(value: String)
+
+    def apply(in: Signal[Props], out: Sink[Event]): HtmlElement =
+        Flex.row(
+            customInput(
+                value <-- in.map(_.value),
+                onChange.mapToValue.map(Event.ChangeValue(_)) --> out,
+            ),
+            customButton(
+                "Submit",
+                onClick(_.withCurrentValueOf(in).map(t => Event.SubmitValue(t._2.value))) --> out,
+            ),
+        )
 ```
 
-Note that we have extracted the `onClick` transformation outside of the `div(..., button(...))`, as it's fairly verbose (composing event properties is one of my least favorite parts of the Laminar API) and assigned it to `onClickMappedToIndex`. This updated event property can then be bound to `handleRemove` within the button argument list.
+Whereas in React we would include separate callbacks as properties to handle the different events that may may be triggered in our component, in Laminar we can require parents to provide only a single handler `out`, which handles *all* the events. This is possible if we model our events as a single `enum` type with a different case for each distinct event type. The "handler" `out` is a `Sink[Event]`, which essentially means any Airstream type that can *consume* an `Event`. As [discussed above](#2-events-over-callbacks), we are going to think of our components dynamics in terms the flow of data (`EventStream`s and `Sink`s) rather than in terms of handlers (i.e., callbacks).
 
-## Application architecture
+Declaring our events under a single `enum` type (or a `sealed` class hierarchy if you're using Scala 2) and exposing them in a single handler has additional benefits. It encourages parent components to provide a coherent logic to how it uses its components. Rather than implement its handlers piecemeal, it will generally choose to match on the events in one place and determine what actions to take, our how to translate them into its own proper event type (which is generally the best structure your event logic). This makes refactoring easier: if you need to change how you model your events, it is very easy to trace your way through the upstream logic that needs to be updated to accomodate those changes. It is easier to make those updates as well when every component has its entire event-handling logic together in one place. You can quickly see how changing the way one event is handled may require changes to how another event is handled, and what other changes may be needed.
 
-Now that we have all of the tools we need to render state in a quasi-functional manner while avoiding unnecessary re-rendering, let's sketch what a complete React-like application would look like in Laminar.
+### Disciplined rendering
 
-### State and events
+Now that we've covered the basics of component design and can construct components that can support arbitrary dynamics (even if they themselves don't maintain the state needed to implement those dynamics -- we'll get to that later), we should cover what may be the most important subject in this article: how to ensure that components render elements only when they need to be.
 
-While React supports a number of different state management paradigms, Laminar is particular well-suited for *event-driven architecture*. This is because the reactive architecture is designed primarily for data rather than callbacks. Thus, instead of binding `onClick` to an observer that updates state via callback, it is cleaner to map the `onClick` DOM event to a custom event and bind the updated listener to an observer that processes these custom events.
+As [discussed above](#2-think-about-rendering), Laminar does not provide a virtual DOM to think about rendering for you, so you need to be careful how you design your component's rendering logic. Fortunately there just a small number of tricks that, if used consistently, will prevent over-rendering from ever becoming a problem.
 
-My preference is therefore to construct my top-level applicatison state in a manner similar to redux: define a "store" (in our case we'll just make this a `Var`) and a "reducer" (a function that updates state based an event) and then wire them together:
+#### 3. Rendering arrays
 
-```scala
-enum WindowState:
-	case Window1State(...)
-	case Window2State(...)
+The first and most obvious case of rendering issues for someone coming from React has to do with rendering DOM arrays. In React, this is one place where you always need to take some action to ensure rendering works properly. The reason is that when you have a single element in your JSX, React can always compare the element before and after a change of state; but when you construct an array of elements on each state change, React doesn't necessarily know which elements to compare between the first array and the second. To help it do so, you have to provide a "key" on each element in the array so that React can look up comparable elements.
 
-final case class GlobalState(
-	windowState: WindowState
-	...
-)
+While Laminar does not have a virtual DOM to compare against, it does provide an equivalent strategy for dealing with the same problem. On any `Signal` of a *collection* of values (any standard Scala collection will work with this), it exposes a `split` method, which allows you to (1) map each member of the collection to a key, and (2) render each element using the key and a signal *of the member value*. The function you provide to render the element will only be called once for each member in the collection whose key remains consistent across updates, and the changing values of that member will be exposed in the signal. Only when then original signal fails to produce a given key will the corresponding element be unmounted; the next time it appears, the rendering function will be called again.
 
-enum GlobalEvent:
-	case ChooseWindow1, ChooseWindow2,
-	...
+This is what the split method looks like in action:
 
-object Store:
-	private val stateVar = Var(GlobalState(???)) // initial value
+[laminar-react/js/src/main/scala/article/Example3RenderArray.scala](laminar-react/js/src/main/scala/article/Example3RenderArray.scala)
+```scala 3
+object RenderArray:
+    final case class Entry(label: String, text: String)
 
-	val eventSink: Sink[GlobalEvent] = stateVar.updater[GlobalEvent]:
-		case (state, event) => ??? // This is your reducer: generate new state
+    final case class Props(
+        header: String,
+        body: List[Entry],
+    )
 
-	val state: Signal[State] = stateVar.signal
+    def apply(in: Signal[Props]): HtmlElement =
+        val bodyEntries: Signal[List[HtmlElement]] = in
+            .map(_.body)
+            .split(_.label): (label: String, _: Entry, entrySignal: Signal[Entry]) =>
+                li(
+                    Flex.row(
+                        input(`type` := "checkbox"),
+                        div(label),
+                        div(
+                            text <-- entrySignal.map(_.text),
+                        )
+                    )
+                )
+
+        Flex.column(
+            h1(
+                text <-- in.map(_.header),
+            ),
+            ul(
+                children <-- bodyEntries,
+            )
+        )
 ```
 
-The `Store` object above exposes two public members that can be used for your application: `state`, which provides the current value of the state, and `eventSink` that `GlobalEvent`s can be wired into from reactive event listeners.
+In the above example, the `body` property contains a `List` of entries (each containing a `label` and some `text`). The body is rendered in `bodyEntries`; to generate the keys, each `Entry` in `body` is mapped to its `label`. The implication is that `label`s are expected to be *unique*, so that the same label will only ever appear once in the collection and can be used to track the same element across state changes. If `label` were not expected to be unique, we would probably want to include the element index as part of the key.
 
-### Component hierarchy
+After the key is generated using `.split(_.label)`, a function is provided with three parameters: `label`, which is the key; `_`, an unused parameter containing the full initial value of the `Entry`; and `entrySignal`, a signal of `Entry` values *for the element corresponding to this particular `label`*. The unused `Entry` parameter comes from the initial value of the signal when the key (or `label`) first appears. It allows you to render properties statically in cases where you know they won't change. Since the only static property we need is the `label`, and this is provided as the key parameter, we don't use it. Everything else is rendered from the `entrySignal`.
 
-Now let's sketch what a top level component might look like:
+It may take a little to get used to `split`, but it helps to think of it as a super-`map`. It maps each member of a collection to an element, but does so in a special way to handle the rendering problem, routing the state changes for each of the *same* members of the collection to your rendering function in the form of a signal, [which of course is what we always want](#1-data-should-almost-always-be-reactive).
 
-```scala
-object AppComponent:
-	def apply(): HtmlElement =
-		val windowState = Store.state.map(_.windowState).distinct
+Note that the output of calling `split` in the above example is a `Signal[List[HtmlElement]]`. It generates a *signal* of elements in the *same collection type* as the original signal. A signal of a collection of elements can be rendered as children of any other element using the `children` receiver. So in at the bottom of the example `bodyEntries` is rendered using the expression `children <-- bodyEntries`.
 
-		div(
-			Menu(windowState),
-			child <-- windowState
-				.routeSignal({ case st: WindowState.Window1State => st })(w1Signal => Window1(w1Signal))
-				.routeSignal({ case st: WindowState.Window2State => st })(w2Signal => Window2(w2Signal)),
-				.result,
-		)
+It is possible also to generate signals of collections of Laminar elements without `split`. We could render directly from the props signal, for instance, which would look like the following:
+
+[laminar-react/js/src/main/scala/article/Example4RenderArrayBad.scala](laminar-react/js/src/main/scala/article/Example4RenderArrayBad.scala)
+```scala 3
+...
+object RenderArrayBad:
+    ...
+        val bodyEntries: Signal[List[HtmlElement]] = in.map: props =>
+            props.body.map:
+                case Entry(label, text) =>
+                    li(
+                        Flex.row(
+                            input(`type` := "checkbox"),
+                            div(label),
+                            div(text)
+                        )
+                    )
+    ...
 ```
 
-The top level component narrows the global state down to `WindowState`, filters out extraneous updates (see the use of `.distinct` in [`SignalRouter`](laminar-react/js/src/main/scala/util/SignalRouter.scala)), and passes this first to the menu component. It then conditionally renders the selected window, passing the further narrowed state to the appropriate window component.
+Note that in the above example, both `label` and `text` are rendered statically as regular strings -- not bound as reactive inputs with `<--`, since of course they are not reactive. This fact alone reveals immediately that the `li(Flex.row(...))` element being rendered is going to be re-rendered on each state change.
 
-These components may not need to access the global state at all, but can simply use the signal passed to them:
+To see how this affects the component behavior, run "Example 3" and then "Example 4" in the demo application from this repository. Both examples provide the same inputs to both of these two examples: every ten seconds it generates a new random set of entries, every 1.5 seconds it shuffles those entries, and every 4 seconds it generates a new header. This allows us to see how different kinds of changes affect the rendering in different ways. Each entry includes an uncontrolled checkbox, which allows us to test rendering. Since the state of that checkbox is maintained by the element, it will be cleared each time the element is rerendered.
 
-```scala
-object Menu:
-	def apply(input: Signal[WindowState]): HtmlElement =
-		ul(
-			li(
-				"Window 1",
-				cursor.pointer,
-				onClick.mapTo(GlobalEvent.ChooseWindow1) --> Store.eventSink,
-				backgroundColor <-- input.map: // Highlight when selected
-					case _: WindowState.Window1State => "lightblue"
-					case _ => "inherit",
-			),
-			li(
-				"Window 2",
-				cursor.pointer,
-				onClick.mapTo(GlobalEvent.ChooseWindow2) --> Store.eventSink,
-				backgroundColor <-- input.map: // Highlight when selected
-					case _: WindowState.Window2State => "lightblue"
-					case _ => "inherit"
-			),
-		)
+We notice in the "good" example (Example 3), when we start clicking on checkboxes, they stay checked as the list of entries is shuffled. The only time they are cleared is when we either clear them ourselves or wait ten seconds for the entire list to changed. In the latter case, when the list generates new `label`s for each entry, Laminar throws out the old ones and rerenders.
 
-object Window1State:
-	def apply(input: Signal[Window1State]): HtmlElement =
-		???
+In the "bad" example, on the other hand, every check mark is cleared every time the list is shuffled. This is because each element is rerendered from scratch on each state update, most notably when the list is shuffled (the most frequent state change). When you render this way, any time *anything* changes in the input signal, you are going to lose any state local to those components, whether that state is maintained in the DOM (as in this case), or is maintained by the Laminar component. Even if you don't care about that, however, (say *all* of your state is propagated through the original signal), it will affect the performance of your application to rerender *every* element of your list with every update. *Make sure you use `split` to render collections*.
 
-object Window2State:
-	def apply(input: Signal[Window2State]): HtmlElement =
-		???
+#### 4. Simple conditional rendering
+
+While most people coming from React should be aware of the need to render arrays cautiously, they will likely be less prepared to address the next challenge, which is rendering *individual* elements *conditionally*. The basic difficulty is this: if some of your input data must be rendered very differently depending on its current value, you will have to sometimes rerender as the properties change. The problem is that you don't want to rerender the whole thing every time *any* property changes, but only when those specific properties that determine the specific mode of rendering your application changes.
+
+In effect, Laminar has the same problem for conditional rendering that Laminar and React both have for rendering arrays: it needs some way to determine when a single element, which *sometimes* needs to be rerendered, is the *same* across changes of state.
+
+There are three basic strategies for dealing with this problem. The first two are nearly equivalent and can be used for simple cases like the following:
+
+[laminar-react/js/src/main/scala/article/Example5ConditionalRenderSimple.scala](laminar-react/js/src/main/scala/article/Example5ConditionalRenderSimple.scala)
+```scala 3
+object ConditionalRenderSimple:
+    enum Choice:
+        case One, Two
+
+    final case class Props(choice: Choice, header: String, body: String)
+
+    enum Event:
+        case Choose1, Choose2
+
+    def apply(in: Signal[Props], out: Sink[Event]): HtmlElement = {
+        // .distinct is an easy way to render conditionally in simple cases
+        // as it ensures the element will be rerendered only when the value
+        // *changes*.
+        val headerElement: Signal[HtmlElement] = in.map(_.choice).distinct.map:
+            case Choice.One => Flex.row(input(`type` := "checkbox"), "Choice 1")
+            case Choice.Two => Flex.row(input(`type` := "checkbox"), "Choice 2")
+
+        // .splitOne is another way to render conditionally. It is slightly
+        // more powerful than .distinct by allowing you to render
+        // based on both the value of the key and the *initial* value of the
+        // signal upon rendering
+        val choiceElement = in.splitOne(_.choice):
+            case (Choice.One, _, signal) =>
+                StatelessInput(signal.map(p => StatelessInput.Props(p.header, p.body)))
+            case (Choice.Two, _, signal) =>
+                Flex.row(
+                    alignItems.start,
+                    input(`type` := "checkbox"),
+                    div(text <-- signal.map(_.header)),
+                    div(
+                        overflowX.auto,
+                        text <-- signal.map(_.body),
+                    ),
+                )
+
+        def eventFromValue(choiceValue: String): Option[Event] =
+            if choiceValue == Choice.One.toString then Some(Event.Choose1)
+            else if choiceValue == Choice.Two.toString then Some(Event.Choose2)
+            else None
+
+        Flex.column(
+            h3(child <-- headerElement),
+            customSelect(
+                customOption("Choice 1", value := Choice.One.toString),
+                customOption("Choice 2", value := Choice.Two.toString),
+                value <-- in.map(_.choice.toString),
+                onChange.mapToValue
+                    .map(eventFromValue)
+                    .collect({ case Some(v) => v }) --> out,
+            ),
+            child <-- choiceElement,
+        )
+    }
 ```
 
-We see here a general pattern for constructing an application in a React-like way. Components are just functions from a signal to an element (defined in the above example as objects with `apply` methods). Each component function can route its input signal, narrowing the state down to the parts relevent to each of its child. DOM event listeners can be mapped to domain events and wired into event handlers.
+The above component renders the same data differently depending on the input value `choice`, whose type `Choice` is an `enum` with two possible states: `Choice.One`, and `Choice.Two`. A select element is provided to choose between the two choices. Two different parts of the component are rendered differently depending on the choice: the `headerElement` and the `choiceElement` (i.e., the body), which allows us to showcase two different ways of approaching the problem. These are constructed as signals of `HtmlElement`s and are rendered in the final element using the `child` receiver (`child <-- headerElement` and `child <-- choiceElement`) which is analogous to the `children` receiver we saw above.
 
-For an example of a more elaborate application see the [To-Do list app](laminar-react/js/src/main/scala/todo/AppComponent.scala) in this repository.
+The simplest way to correctly render conditionally can be seen in the definition of `headerElement`, which simply maps the input to the `choice` property, calls `distinct` on the result, and then maps again. If `distinct` were left out, this would not work properly, as every state change would lead to subsequent `map` function being called and generating a new version of the same element. When we call `distinct`, however, we generate a new version of the same signal that filters out any updates that do not actually change the value of the signal. The only time this new signal will propate through the last call to `map` is when a new `Choice` is provided.
+
+A similar, but slightly more powerful version of the same thing is shown in `choiceElement`. Here the signal is rendered using `splitOne`, which is similar in form to `split`: the signal is mapped to a key (`choice`, in this case) and then the key, initial value, and signal is rendered. Unlike `split`, however, the signal that's passed is not different from the original, so it's not really that useful. In fact, when using `distinct` you have access to both the key and the relevant signal, so the only thing that `splitOne` really provides that `distinct` doesn't is access to the full initial static value of the signal for each rerendering. I rarely use that, so it's not much of an advantage.
+
+Nevertheless, I still prefer using `splitOne` simply because it's a little more explicit about what's going on. You can delete the `.distinct` without breaking anything else in your code, which could be easy for someone to do who is not familiar with the code base, and not notice a problem until runtime. Due to its similarity to `split`, `splitOne` makes it a little more clear that it's addressing the rendering problem, and it's harder to overlook or accidentally remove.
+
+As with rendering arrays, it is very easy to *not* render conditional elements correctly as we can see in the following *bad* example:
+
+[laminar-react/js/src/main/scala/article/Example6ConditionalRenderSimpleBad.scala](laminar-react/js/src/main/scala/article/Example6ConditionalRenderSimpleBad.scala)
+```scala 3
+...
+object ConditionalRenderSimpleBad:
+    ...
+        val choiceElement = in.map:
+            case Props(Choice.One, header, body) =>
+                StatelessInput(Val(StatelessInput.Props(header, body)))
+            case Props(Choice.Two, header, body) =>
+                Flex.row(
+                    alignItems.start,
+                    input(`type` := "checkbox"),
+                    div(header),
+                    div(
+                        overflowX.auto,
+                        body,
+                    ),
+                )
+    ...
+```
+
+Once again, we end up passing static (non-reactive) values to the components we render, which is a sure sign that we're doing something wrong. In fact, just to make this work, we have to wrap the props we pass to `StatelessInput` in `Val`, which is a reactive wrapper around unchanging data. This should only be used when you want to render something that requires a reactive element from data that really isn't ever changing. The fact that we're forced to use it here should immediately tell something isn't right.
+
+Running Example 4 and 5, you can see the effects for yourself. In Example 4 (the correct version), as new data is piped into the element every second or so, the state of the checkbox next to the header does not change unless you select a new choice from the drop-down menu. When you select "Choice 2", you will see another checkbox next to the text rendered at the bottom. This one will also remain consistent as long as the choice does not change. Trying the same thing in Example 5, however, we once again see that every single update to the text clears both checkboxes, even when we haven't changed the choice.
+
+#### 5. Complex conditional rendering
+
+While `splitOne` (or `distinct`) is sufficient to address a lot of typically scenarios, you will find as your application state gets more complex and precise (as it should!) that they sometimes don't work well. Consider what happens when your `Props` are not a straightforward case class, but an `enum`:
+
+[laminar-react/js/src/main/scala/article/Example7ConditionalRenderComplex.scala](laminar-react/js/src/main/scala/article/Example7ConditionalRenderComplex.scala)
+```scala 3
+object ConditionalRenderComplex:
+    enum Props:
+        case Choice1(header: String, body: String)
+        case Choice2(header: String, body: List[(String, String)])
+
+    enum Event:
+        case Choose1, Choose2
+
+    def apply(in: Signal[Props], out: Sink[Event]): HtmlElement = {
+        val choiceElement = in
+            .splitOne(???): (_, _, signal) =>
+                ???
+
+        val selectValue = in.map:
+            case _: Props.Choice1 => "1"
+            case _: Props.Choice2 => "2"
+
+        def eventFromValue(value: String): Option[Event] =
+            if value == "1" then Some(Event.Choose1)
+            else if value == "2" then Some(Event.Choose2)
+            else None
+
+        Flex.column(
+            customSelect(
+                customOption("Choice 1", value := "1"),
+                customOption("Choice 2", value := "2"),
+                value <-- selectValue,
+                onChange.mapToValue
+                    .map(eventFromValue)
+                    .collect( { case Some(i) => i }) --> out,
+            ),
+            child <-- choiceElement
+        )
+    }
+```
+
+The above example is very similar to the previous example, except instead of the props having the same shape for each choice, each choice corresponds to an entirely different set of properties. This is actually one of the great things about using Scala instead of JS/TS, as this is often a *much* clearer and safer model of many scenarios than a flat set of properties where certain ones discriminate between "modes" and others only have meaning within certain modes. The problem, however, is that now it's considerably tricker to "split" the data signal. Here is what we would have to do:
+
+```scala 3
+val choiceElement = in
+    .splitOne({
+        case _: Props.Choice1 => 1
+        case _: Props.Choice2 => 2
+    }):
+        case (_, initial: Props.Choice1, signal) =>
+            val typedSignal = signal.changes.collect {
+                case ch1: Props.Choice1 => ch1
+            }.toSignal(initial)
+            StatelessInput(typedSignal.map(p => StatelessInput.Props(p.header, p.body)))
+        case (_, initial: Props.Choice2, signal) =>
+            val typedSignal = signal.changes.collect {
+                case ch2: Props.Choice2 => ch2
+            }.toSignal(initial)
+            val renderArrayIn = typedSignal
+                .map(p => RenderArray.Props(p.header, p.body.map(RenderArray.Entry.apply.tupled)))
+            RenderArray(renderArrayIn)
+```
+
+This approach -- *which I do not recommend* -- requires matching on the same basic thing *three different times*! First, we have to match on the the props to generate some arbitrary key corresponding to each mode (in this case I use integers 1 and 2). Next, we have to match on the initial value to decide what to render. Finally, we have to narrow our signal down to the relevant case using `collect` in order to render anything from it. This is much too verbose.
+
+Fortunately, Laminar provides us with a macro-based solution `splitMatchOne` that allows us to avoid all this redundant matching:
+
+[laminar-react/js/src/main/scala/article/Example7ConditionalRenderComplex.scala](laminar-react/js/src/main/scala/article/Example7ConditionalRenderComplex.scala)
+```scala 3
+object ConditionalRenderComplex:
+    ...
+        val choiceElement = in
+            .splitMatchOne
+            // First variant: match case, transform, render
+            .handleCase({
+                case Props.Choice1(header, body) => StatelessInput.Props(header, body)
+            }) { (_, propsSignal) =>
+                StatelessInput(propsSignal)
+            }
+            // Second variant: match type, render
+            .handleType[Props.Choice2] { (_, propsSignal) =>
+                val renderArrayIn = propsSignal
+                    .map(p => RenderArray.Props(p.header, p.body.map(RenderArray.Entry.apply.tupled)))
+                RenderArray(renderArrayIn)
+            }
+            .toSignal
+    ...
+```
+
+Here we call `splitMatchOne` on the input signal `in`, returning a special utility that allows us to handle each case separately. First we handle `Choice1` using `handleCase`, which allows us to match a case and transform it using a partial function and then render the transformed signal. This is useful for `Props.Choice1` because we can just directly generate the `StatelessInput.Props` that we intend to render.
+
+In the second case, we use `handleType`, which allows to specify the subtype we want to match and we don't have to provide a matching partial function at all. We can see in the example why it's actually better in this case to use `handleCase`, as it would simplify the preparation of the `RenderArray.Props` (I included `handleType` here just for demonstration). `handleType` is useful for simpler cases where you don't need to do any complicated mapping of the signal. I typically use `handleType[Any]((_, _) => emptyNode)` at the bottom of a `splitMatchOne` expression, for instance, to render an empty default case.
+
+Once again, it is easy to see how this can be done incorrectly:
+
+[laminar-react/js/src/main/scala/article/Example8ConditionalRenderComplexBad.scala](laminar-react/js/src/main/scala/article/Example8ConditionalRenderComplexBad.scala)
+```scala 3
+...
+object ConditionalRenderComplexBad:
+    ...
+        val choiceElement = in.map:
+            case Props.Choice1(header, body) =>
+                StatelessInput(Val(StatelessInput.Props(header, body)))
+
+            case Props.Choice2(header, entries) =>
+                RenderArray(Val(RenderArray.Props(header, entries.map(RenderArray.Entry.apply.tupled))))
+    ...
+```
+
+Note how much much simpler it is, in this case, to simply match on the original state without the indirection of `splitOne` or `splitMatchOne`. As you first work on Laminar components, you may have a strong inclination to construct elements this way. Make sure you get used to reaching for `splitOne` and `splitMatchOne` any time you need to render a different element for different state.
+
+The good news is that once you get used to always using `split`, `splitOne`, and `splitMatchOne`, you actually don't have to give much thought at all to rendering. Moreover, any time you run into rendering problems -- say components are losing state unexpectedly -- it's not hard to trace it to a `map` that needs to turn into a `splitX`. Everything else can then be thought about in more or less the same way you think about a React application: as a function from state to DOM. The only difference is that you have to used a specialized mechanism for matching on that state.
+
+As a final note, I'll mention the `splitMatchSeq` method that provides a similar API as `splitMatchOne` but for rendering arrays. It's very similar to `split` and `splitMatchOne` (in fact, it is equivalent to using these together), so I decided not to provide a separate example for it, but you should keep it in mind for when you need to render arrays of ADTs (`enum`s or `sealed` class hierarchies). If you are comfortable with the other `splitX` methods, it will be clear how to use it.
+
+### State management
+
+Now that we have covered data input/output and disciplined rendering, all that remains is using state. Once we are able to manage state in a component, we will be able to construct a complete application.
+
+#### 5. Simple state
+
+The basic reactive data type for state is `Var`. `Var` is a container for a value that can be changed using `set` or `update`. It's current value can be accessed via the `now()` method. However, in keeping with our preference for [events over callbacks](#2-events-over-callbacks), instead we will primarily use `signal` method for reading state via a `Signal`, and the `writer` and `updater`, for writing state via `Observer`s (`Observer` is a kind of `Sink` that data can be piped into via `-->`).
+
+Here is the simplest form of a stateful component:
+
+[laminar-react/js/src/main/scala/article/Example9StatefulSimple.scala](laminar-react/js/src/main/scala/article/Example9StatefulSimple.scala)
+```scala 3
+object StatefulSimple:
+    final case class Props(
+        header: String,
+        body: String,
+    )
+
+    val collapsedState: Var[Boolean] = Var(false)
+
+    def apply(in: Signal[Props]): HtmlElement =
+        Flex.column(
+            h1(
+                text <-- in.map(_.header),
+            ),
+            Flex.row(
+                div("Hide text: "),
+                input(
+                    `type` := "checkbox",
+                    checked <-- collapsedState.signal,
+                    onChange.mapToChecked --> collapsedState.writer,
+                ),
+            ),
+            child <-- collapsedState.signal.distinct.map:
+                case true => emptyNode
+                case false =>
+                    div(
+                        text <-- in.map(_.body),
+                    )
+        )
+```
+
+This example component provides a collapsible view of some text. The header is always displayed, while the body is ownly displayed when the value of the `Var` `collapsibleState` is false. This state is controlled by a checkbox, whose `checked` state is pulled from `collapsibleState`'s `signal`, and whose `onChange` events are piped into `collapsibleState`'s `writer`. `writer` is a simple `Observer` that set's the `Var` to the observed value. The body is then rendered conditionally based on the current state of `collapsedState`: when it is `true` and `emptyNode` is rendered, and when `false`, a `div` containing the input body is rendered.
+
+The result, which you can see by running "Example 9," is equivalent to a standard controlled React component. When you click the the checkbox, it's checkmark appears and the body text disappears. When you click again, the checkmark disappears and the body text reappears.
+
+#### 6. Complex state
+
+The above example is enough, in principle, to show you how to construct any application: just throw the initial state in a `Var` and use it's `signal` and `writer` as inputs and outputs for your components. Again, however, there are a number of ways that a `Var` can be used, and some of these ways can not work very well as your application scales in complexity. In particular, it is easy to lose sight of the [events over callbacks](#2-events-over-callbacks) principle as it's not necessarily obvious how to control state via events as your state model becomes more complex. The prior example provides an uncommonly simple case where the state `Boolean` corresponds directly to the `onChange.mapToChecked` event processor. What about when your state is more elaborate?
+
+To see how more complicated cases can be handled properly, let's work through the following example: a component that displays a list of text items, allowing the user to add new items, remove them, and shuffle their order. This should be complicated enough to require a more elaborate approach while being simple enough to follow easily.
+
+Let's begin by modeling our *state* and our *events*. This will look very similar to how we modeled our input `Props` and output `Event` [above](#2-controlled-stateless-component). In fact, we are doing essentially the same thing, since the state and events will indeed be inputs and outputs of the elements we're rendering. Now, however, will keep these types `private` since any parent components will not be able to use them and should not have to access them. We will call our event type `StateEvent` so that it won't conflict with public events if we decide to expose any. Finally, we will include a `reduce` function on `State`, that determines how the state is updated by each `StateEvent`.
+
+[laminar-react/js/src/main/scala/article/Example10StatefulComplex.scala](laminar-react/js/src/main/scala/article/Example10StatefulComplex.scala)
+```scala 3
+object StatefulComplex:
+    private enum StateEvent:
+        case StartEditingItem
+        case ChangeCurrentItem(newText: String)
+        case StopEditingItem
+        case AddCurrentItem
+        case RemoveItem(index: Int)
+        case Shuffle
+
+    private case class State(currentItem: Option[String], existingItems: Vector[String]):
+        def reduce(event: StateEvent): State = event match
+            case StateEvent.StartEditingItem => copy(currentItem = currentItem.orElse(Some("")))
+            case StateEvent.ChangeCurrentItem(newText) => copy(currentItem = Some(newText))
+            case StateEvent.StopEditingItem => copy(currentItem = None)
+            case StateEvent.AddCurrentItem => copy(
+                currentItem = None,
+                existingItems = currentItem match {
+                    case None => existingItems
+                    case Some(txt) => existingItems.appended(txt)
+                },
+            )
+            case StateEvent.RemoveItem(index) => copy(existingItems = existingItems.patch(index, Nil, 1))
+            case StateEvent.Shuffle => copy(existingItems = scala.util.Random.shuffle(existingItems))
+```
+
+These two type definitions, along with `State#reduce` determine the entire behavior of the component. Once this is defined, implementing the rest of the component is fairly straightforward:
+
+[laminar-react/js/src/main/scala/article/Example10StatefulComplex.scala](laminar-react/js/src/main/scala/article/Example10StatefulComplex.scala)
+```scala 3
+object StatefulComplex:
+    ...
+    def apply(): HtmlElement =
+        val state = Var(State(None, Vector.empty))
+        val eventSink = state.updater[StateEvent]((state, event) => state.reduce(event))
+
+        val addItemComponent = state.signal
+            .splitMatchOne
+            .handleCase({ case State(None, _) => () }) { (_, _) =>
+                customButton(
+                    Flex.row(Icon.add(Icon.small), "Add item", gap := "5px"),
+                    onClick.mapTo(StateEvent.StartEditingItem) --> eventSink,
+                )
+            }
+            .handleCase({ case State(Some(txt), _) => txt }) { (_, textSignal) =>
+                Flex.row(
+                    "Item text",
+                    customInput(value <-- textSignal, onInput.mapToValue.map(StateEvent.ChangeCurrentItem(_)) --> eventSink),
+                    Flex.row(
+                        gap := "5px",
+                        customButton(
+                            "Add",
+                            disabled <-- textSignal.map(_.strip.isEmpty),
+                            onClick.mapTo(StateEvent.AddCurrentItem) --> eventSink,
+                        ),
+                        customButton(
+                            "Cancel",
+                            onClick.mapTo(StateEvent.StopEditingItem) --> eventSink,
+                        )
+                    )
+                )
+            }
+            .toSignal
+
+        def renderSingleListItem(itemSignal: Signal[(String, Int)]): HtmlElement = {
+            val onClickMappedToRemoveItem =
+                onClick(_.withCurrentValueOf(itemSignal).map(v => StateEvent.RemoveItem(v._3)))
+
+            li(
+                Flex.row(
+                    input(`type` := "checkbox"),
+                    text <-- itemSignal.map(_._1),
+                    Icon.close(
+                        makeIconButton,
+                        onClickMappedToRemoveItem --> eventSink,
+                    ),
+                    gap := "5px",
+                ),
+            )
+        }
+
+        div(
+            child <-- addItemComponent,
+            ul(
+                children <-- state.signal
+                    .map(_.existingItems.zipWithIndex)
+                    .split(_._1)(
+                        (_, _, listItemSignal) => renderSingleListItem(listItemSignal)
+                    )
+            ),
+            child <-- state.signal.map(_.existingItems.nonEmpty).distinct.map:
+                case true => customButton("Shuffle items", onClick.mapTo(StateEvent.Shuffle) --> eventSink)
+                case false => emptyNode
+        )
+```
+
+State is stored in the `state` `Var`, which is constructed with an initial value. An event sink `eventSink` is easily constructed using the `updater` method on `Var`, which produces an `Observer` pretty much directly from `reducer`. The component's element tree is then constructed from `state.signal`, which exposes the current value of the `State` as as a `Signal`. Event props are mapped to `StateEvent` values and piped into `eventSink`. No state logic needs to be included anywhere in the rendered expression: it's simply a matter of connecting the appropriate DOM event to the appropriate component `StateEvent`.
+
+The only somewhat complicated part of the component is rendering the button that removes each item. Each removal button's `onClick` event property needs to be mapped to a `StateEvent.RemoveItem` which requires including the item's index. This requires accessing the state, which is only accessible via the signal. To access the state signal from a DOM event, we have to combine it with the event property's underlying event stream using `compose`: `onClick.compose(_.withCurrentValueOf(itemSignal).map(v => StateEvent.RemoveItem(v._3)))`. `compose` accepts a function transforming the event stream, which can be combined with the signal using the `withCurrentValueOf` method. Then `map` is used to extract the item number (the third member of the resulting tuple) and wrap it in `RemoveItem`.
+
+#### 8. Global state (Redux)
+
+You may recognize that the above pattern is similar to the popular React-redux combination, in which an event store is used to manage state and state is updated by dispatching actions. Generally, this state is stored and used at the top level of the application and accessed at any depth via React "context," which provides both the state and the required dispatch function. Whereas this pattern is somewhat cumbersome to use in React for local state, in Scala it's sufficiently ergonomic that I highly recommend using it for local as well as global state.
+
+Nevertheless, it can be useful to define a state and event model shared throughout the application in the same way Redux is used in React. To do this, let's begin by creating an abstraction for our state store. As we have seen, all we really need is an initial state and a reducer, and we can construct the inputs and outputs by constructing a `Var`. One useful thing we can add to this is an `EventBus`. By routing the event input through an event bus, we can also support subscriptions to all events that are dispatched. We can use for things like logging and persistence, or to handle certain events with I/O after updating state.
+
+Here is what our abstraction would look like:
+
+```scala 3
+class StateContext[State, Event](
+    initialState: State,
+    reduce: (State, Event) => State
+):
+    private val stateVar = Var(initialState)
+    private val stateUpdater = stateVar.updater(reduce)
+    private val eventBus = EventBus[Event]()
+
+    def input: Sink[Event] = eventBus.writer
+
+    def events: EventStream[Event] = eventBus.events
+
+    def state: Signal[State] = stateVar.signal
+
+    // Needs to be bound to an element to work
+    def bind: Binder[Element] = eventBus.events --> stateUpdater
+```
+
+Notice that we also include a `bind` method: this must be attached to an element so that the subscription of `stateUpdater` to `eventBus.events` is scoped to something with a lifecycle, as it's a resource that must be cleaned up. We can do this by passing it to a tag, just as we do with any other event binding.
+
+Now we can define the global state and event model for interface in the same way as before:
+
+```scala 3
+enum AppEvent:
+    case ...
+
+final case class AppState(...):
+    def reduce(event: AppEvent): AppState = ???
+
+type AppContext = StateContext[AppState, AppEvent]
+```
+
+Since we are going to be accessing our state throughout our application, we also include here a type alias `AppContext` for the `StateContext` specific to our application.
+
+Our application, then, must make an instance of `AppContext` available to any component within it. In React, this is accomplished by creating a React context at the top level, which any child component at any level can retrieve from the environment. In Scala, we have a more typesafe method of passing context, which is to provide it *implicitly* with `using` or "context" parameters. Every component that needs to use the `AppContext` just includes it in as a `using` parameter in its `apply` function: 
+
+```scala 3
+object ConnectedComponent:
+    final case class Props(...)
+
+    enum Event:
+        case ...
+
+    def apply(input: Signal[Props], output: Sink[Event])(using appStore: AppStore): HtmlElement =
+        ???
+```
+
+Just as in React, these "connected" components can also have their own state and inputs and outputs separate from those of the global application context.
+
+For any component to invoke a connected component, it must also be a connected component *or* it must construct an implicit context to pass to them. This should be done at the top level:
+
+```scala 3
+object TopLevelComponent:
+    def apply(): HtmlElement =
+        given appStore = StateStore[AppState, AppEvent](
+            AppState(...),
+            (state, event) => state.reduce(event),
+        )
+
+        propsSignal: Signal[ConnectedComponent.Props] = ???
+        eventSink: Sink[ConnectedComponent.Event] = ???
+    
+        ConnectedComponent(propsSignal, eventSink)
+```
+
+And easy as that, we have a Redux-style with global application state and connected components.
+
+#### 9. Anatomy of a laminar component in the React model
+
+We have now covered how to translate all the basic React patterns into Laminar. Let's conclude with an overview of all parts of a Laminar component. This sketch can be used as a reference as you construct your application. Note that not all parts included here should be included in every Laminar component, but every Laminar component should include some of these parts.
+
+```scala 3
+object Component:
+    // Outputs and inputs
+
+    enum Event:
+        case ...
+
+    final case class Props(...)
+
+    // Local state and events
+
+    private enum StateEvent:
+        case ...
+
+    private final case class State(...):
+        def reduce(event: StateEvent): State = ???
+
+    // Construct element from inputs, outputs, and global state
+    def apply(in: Signal[Props], out: Sink[Event])(using appStore: AppStore): HtmlElement =
+        // Initialize local state on each render
+        val localState = StateStore(
+            State(...), 
+            (state, event) => state.reduce(event)
+        )
+
+        // Define element
+        ???
+```
+
+While there is no necessity you use the naming conventions I have used here, I strongly encourage you to be consistent across your entire application. This will provide a reliable framework new contributors on your project can use to quickly work out what different components are doing.
 
 ## Conclusion
 
-I hope this article has made clear how Laminar can be used to construct a front-end application in the style of React: as a (relatively) straight-forward declarative function from state to view, propagating the state through child components, which can themselves be understood as functions from properties to views. In the case of Laminar, our application is a function from a `Signal` of the state to a view, which  propagates the state through components that are functions from `Signal`s of properties to views. These signals have to be routed using a special syntax for conditional rendering, but once this is done, the rest works more or less the same way.
+I hope this article has made clear how Laminar can be used to construct a front-end application in the style of React: as a (relatively) straight-forward declarative function from state to a DOM tree (a *virtual* DOM tree, to be precise), propagating the state through child components, which can themselves be understood as functions from properties to DOM trees. In the case of Laminar, our application is a function from a `Signal` of the state to a DOM tree (a Laminar representation of a DOM tree, that is), which  propagates the state through components that are also functions from `Signal`s of properties to DOM trees. These signals have to be routed using a special syntax for conditional rendering, but once this is done, the rest works more or less the same way.
 
-While airstream's reactive data does have some cognitive overhead and conditional rendering does require a bit more ceremony than we're used to, the result is well worth the trouble. Airstream is an incredibly powerful and reliable reactive framework. Once you become familiar with the different data types and their rich menus of combinators, managing your application's dynamics will be substantially easier and more enjoyable than React or any JS/TS framework for web development. Moreover, Scala's syntax is much friendlier to React's functional approach to web development than JS/TS, as its algebraic data types (enums/sealed trait hierarchies) and pattern matching make it possible to model your application state with greater precision while also simplifying the conditional logic needed to use it.
+While Airstream's reactive data does have some cognitive overhead and conditional rendering does require a bit more ceremony than we're used to, the result is well worth the trouble. Airstream is an incredibly powerful and reliable reactive framework. Once you become familiar with the different data types and their rich menus of combinators, managing your application's dynamics will be substantially easier and more enjoyable than React or any JS/TS framework for web development. Moreover, Scala's syntax is much friendlier to React's functional approach to web development than JS/TS, as its algebraic data types (enums/sealed class hierarchies) and pattern matching make it possible to model your application state with greater precision while also simplifying the conditional logic needed to use it.

@@ -1,0 +1,54 @@
+body {
+    font-family: "Roboto", sans-serif;
+    font-optical-sizing: auto;
+    font-style: normal;
+    font-size: initial;
+    font-variation-settings: "wdth" 100;
+}
+
+select {
+    appearance: none;
+}
+
+.standard-button {
+    font-size: inherit;
+    cursor: pointer;
+    background-color: #1976d2;
+    color: white;
+    border: 0;
+    padding: 12px 18px 12px 18px;
+    border-radius: 15px;
+}
+
+.standard-button:hover {
+    background-color: #125ea8;
+}
+
+.standard-button:disabled {
+    cursor: not-allowed;
+    background-color: #dfeaf0;
+    color: #b1b4b5;
+}
+
+.standard-button:hover:active {
+    background-color: #0c4379;
+}
+
+.standard-button img {
+    filter: invert(100%);
+}
+
+.icon-button {
+    font-size: inherit;
+    cursor: pointer;
+    border: 0;
+    border-radius: 50%;
+}
+
+.icon-button:hover {
+    background-color: #e6ebed;
+}
+
+.icon-button:hover:active {
+    background-color: #c6cacc;
+}
