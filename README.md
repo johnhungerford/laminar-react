@@ -4,7 +4,7 @@ Examples of Laminar components modeled after React
 
 ## Dependencies
 
-To compile and run/deploy the code in this repository you will the following installed in your development environment:
+To compile and run/deploy the code in this repository you will neeed at minimum the following installed in your development environment:
 1. sbt
 2. npm
 
@@ -21,47 +21,45 @@ This will compile all the code to Javascript, bundle it, and deploy in a browser
 ## Project structure
 
 ```
-├── LAMINAR-REACT.md (article explaining the code in this repository)
-├── README.md (you're reading this)
 ├── build.sbt
 ├── laminar-react
-│         ├── js (Scala.js source code)
-│         │   ├── jsbundler (JS and other assets used for building deployable web page)
-│         │   │     ├── index.html
-│         │   │     ├── main.js
-│         │   │     ├── package.json
-│         │   │     └── public
-│         │   │         └── logo.png
-│         │   └── src
-│         │       ├── main
-│         │       │    └── scala
-│         │       │        ├── App.scala (Entrypoint: allows choosing from components below)
-│         │       │        ├── article (Examples from article)
-│         │       │        │     ├── Example0Simple.scala
-│         │       │        │     ├── Example1Naive.scala
-│         │       │        │     ├── Example2SplitOne.scala
-│         │       │        │     ├── Example3RouteSignal.scala
-│         │       │        │     ├── Example4SplitArray.scala
-│         │       │        │     ├── Example5CombineSignals.scala
-│         │       │        │     └── Example6HandleWithSignal.scala
-│         │       │        ├── todo (To-Do list application)
-│         │       │        │     ├── AddListComponent.scala
-│         │       │        │     ├── AddToDoComponent.scala
-│         │       │        │     ├── AppComponent.scala (Top-level component)
-│         │       │        │     ├── ChooseListComponent.scala
-│         │       │        │     ├── DoneToDoComponent.scala
-│         │       │        │     ├── ToDoComponent.scala
-│         │       │        │     ├── ToDoListComponent.scala
-│         │       │        │     ├── globalState.scala (application state)
-│         │       │        │     └── model
-│         │       │        │         ├── GlobalEvent.scala
-│         │       │        │         └── GlobalState.scala
-│         │       │        └── util  (reusable utilities)
-│         │       └── test (unused)
-│         └── jvm (Scala for JVM source code -- unused)
-└── project
+│   └── js
+│       ├── jsbundler (bundle artifacts: html, css, JS entrypoint)
+│       └── src
+│           └── main
+│               └── scala
+│                   ├── App.scala (SPA entrypoint)
+│                   ├── article (all examples from article)
+│                   │   ├── Example10StatefulComplex.scala
+│                   │   ├── Example1StatelessInput.scala
+│                   │   ├── Example2StatelessInputOutput.scala
+│                   │   ├── Example3RenderArray.scala
+│                   │   ├── Example4RenderArrayBad.scala
+│                   │   ├── Example5ConditionalRenderSimple.scala
+│                   │   ├── Example6ConditionalRenderSimpleBad.scala
+│                   │   ├── Example7ConditionalRenderComplex.scala
+│                   │   ├── Example8ConditionalRenderComplexBad.scala
+│                   │   ├── Example9StatefulSimple.scala
+│                   │   └── Util.scala
+│                   ├── common (styles and state management helper)
+│                   │   ├── StateContext.scala
+│                   │   └── styles
+│                   │       └── package.scala
+│                   └── todo (example To-Do list application)
+│                       ├── AppComponent.scala
+│                       ├── ChooseListComponent.scala
+│                       ├── CompletedToDoComponent.scala
+│                       ├── CreateListComponent.scala
+│                       ├── CreateToDoComponent.scala
+│                       ├── model
+│                       │   ├── AppEvent.scala
+│                       │   └── AppState.scala
+│                       ├── package.scala
+│                       ├── ToDoComponent.scala
+│                       └── ToDoListComponent.scala
+├── LAMINAR-REACT.md
+└── README.md
 ```
-
 
 ## Article
 
