@@ -28,7 +28,6 @@ In this article I will share with you what I learned from this experience: I wil
 
 Laminar is the most widely adopted web development library native to Scala.js. It allows the user to construct DOM elements via a declarative API that is both intuitive and flexible, and is shipped with its own reactive data framework (Airstream) for managing DOM events and updates. Here is what a simple Laminar application looks like:
 
-*[laminar-react/js/src/main/scala/article/Example0Simple.scala](laminar-react/js/src/main/scala/article/Example0Simple.scala)*
 ```scala
 import com.raquo.Laminar.api.L.{*, given}
 
