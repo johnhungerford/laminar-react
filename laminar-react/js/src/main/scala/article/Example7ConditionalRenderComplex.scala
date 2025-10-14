@@ -1,7 +1,7 @@
 package article
 
 import com.raquo.laminar.api.L.{*, given}
-import common.style.{Flex, customButton, customInput, customOption, customSelect}
+import common.styles.{Flex, customButton, customInput, customOption, customSelect}
 import org.scalajs.dom
 
 import scala.util.Random

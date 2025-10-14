@@ -1,6 +1,6 @@
 # laminar-react
 
-Examples of Laminar components modeled after React
+Examples of Laminar components modeled after React. (See [LAMINAR-REACT.md](LAMINAR-REACT.md) for explanations.)
 
 ## Dependencies
 

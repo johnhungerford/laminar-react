@@ -4,7 +4,7 @@ import com.raquo.laminar.api.L.{*, given}
 import com.raquo.laminar.nodes.ReactiveElement
 import org.scalajs.dom.{HTMLImageElement, HTMLOptionElement, HTMLSelectElement}
 
-package object style:
+package object styles:
 
     val makeButton: Modifier[HtmlElement] = Seq(
         className := "standard-button",
@@ -34,6 +34,7 @@ package object style:
                 borderWidth := "1px",
                 modifiers,
             ),
+            // Overriding the dropdown icon is a little complicated!
             div(
                 pointerEvents.none,
                 position.absolute,
@@ -41,7 +42,7 @@ package object style:
                 top := "20%",
                 bottom := "20%",
                 width := "100%",
-                Icon.expanded(
+                Icon.chevronDown(
                     pointerEvents.none,
                     position.absolute,
                     right := "0",
@@ -138,20 +139,17 @@ package object style:
             )
         }
 
-        def collapsed(modifiers: Modifier[HtmlElement]*): HtmlElement =
+        def chevronRight(modifiers: Modifier[HtmlElement]*): HtmlElement =
             icon("chevron-right")(modifiers)
 
-        def expanded(modifiers: Modifier[HtmlElement]*): HtmlElement =
+        def chevronDown(modifiers: Modifier[HtmlElement]*): HtmlElement =
             icon("chevron-down")(modifiers)
 
         def close(modifiers: Modifier[HtmlElement]*): HtmlElement =
             icon("x")(modifiers)
 
-        def add(modifiers: Modifier[HtmlElement]*): HtmlElement =
+        def plus(modifiers: Modifier[HtmlElement]*): HtmlElement =
             icon("plus")(modifiers)
 
         def refresh(modifiers: Modifier[HtmlElement]*): HtmlElement =
             icon("refresh")(modifiers)
-
-
-

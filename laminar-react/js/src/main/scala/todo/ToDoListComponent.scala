@@ -1,7 +1,7 @@
 package todo
 
 import com.raquo.laminar.api.L.{*, given}
-import common.style.{Flex, Icon, makeIconButton}
+import common.styles.{Flex, Icon, makeIconButton}
 import todo.model.{AppEvent, ToDo, ToDoList, ToDoListState}
 
 

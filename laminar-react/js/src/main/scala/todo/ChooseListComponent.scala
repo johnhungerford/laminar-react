@@ -3,7 +3,7 @@ package todo
 import com.raquo.laminar.api.L.{*, given}
 import org.scalajs.dom.HTMLSelectElement
 import todo.model.{AppEvent, ToDo, ToDoList, ToDoListState}
-import common.style.{Flex, customOption, customSelect}
+import common.styles.{Flex, customOption, customSelect}
 
 
 /** Component for selecting a list from all existing lists (only shows selection if

@@ -2,7 +2,7 @@ package todo
 
 import com.raquo.laminar.api.L.{*, given}
 import com.raquo.laminar.nodes.ReactiveHtmlElement
-import common.style.Flex
+import common.styles.Flex
 import todo.model.{AppEvent, AppState, ToDo, ToDoList, ToDoListState}
 import common.StateContext
 

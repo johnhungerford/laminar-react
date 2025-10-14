@@ -3,7 +3,7 @@ package todo
 import com.raquo.laminar.api.L.{*, given}
 import todo.model.{AppEvent, ToDo, ToDoList}
 import common.StateContext
-import common.style.{Flex, Icon, card, customInput, makeIconButton}
+import common.styles.{Flex, Icon, card, customInput, makeIconButton}
 
 
 /** Displays an in-progress to-do item, with collapsible details. Displays buttons for
@@ -49,9 +49,9 @@ object ToDoComponent:
                         child <-- localContext.state.combineWith(in.map(_.toDo.details)).map:
                             case (_, None) => emptyNode
                             case (State.Collapsed, _) =>
-                                Icon.collapsed(makeIconButton, onClick.mapTo(StateEvent.Expand) --> localContext.input)
+                                Icon.chevronRight(makeIconButton, onClick.mapTo(StateEvent.Expand) --> localContext.input)
                             case (State.Expanded, _) =>
-                                Icon.expanded(makeIconButton, onClick.mapTo(StateEvent.Collapse) --> localContext.input)
+                                Icon.chevronDown(makeIconButton, onClick.mapTo(StateEvent.Collapse) --> localContext.input)
                     ),
                     Icon.close(makeIconButton, onClick.mapTo(StateEvent.Delete) --> localContext.input)
                 ),

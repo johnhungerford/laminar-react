@@ -1,7 +1,7 @@
 package article
 
 import com.raquo.laminar.api.L.{*, given}
-import common.style.Flex
+import common.styles.Flex
 
 object StatelessInput:
     final case class Props(

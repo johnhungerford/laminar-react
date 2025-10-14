@@ -1,7 +1,7 @@
 package article
 
 import com.raquo.laminar.api.L.{*, given}
-import common.style.{Flex, customButton, customInput}
+import common.styles.{Flex, customButton, customInput}
 import org.scalajs.dom
 
 import scala.util.Random
@@ -23,7 +23,7 @@ object StatelessInputOutput:
             ),
             customButton(
                 "Submit",
-                onClick(_.withCurrentValueOf(in).map(t => Event.SubmitValue(t._2.value))) --> out,
+                onClick.compose(_.withCurrentValueOf(in).map(t => Event.SubmitValue(t._2.value))) --> out,
             ),
         )
 

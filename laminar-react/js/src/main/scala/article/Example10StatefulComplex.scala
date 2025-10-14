@@ -1,7 +1,7 @@
 package article
 
 import com.raquo.laminar.api.L.{*, given}
-import common.style.{Flex, Icon, customButton, customInput, customOption, customSelect, makeIconButton}
+import common.styles.{Flex, Icon, customButton, customInput, customOption, customSelect, makeIconButton}
 import org.scalajs.dom
 
 import scala.util.Random
@@ -38,7 +38,7 @@ object StatefulComplex:
             .splitMatchOne
             .handleCase({ case State(None, _) => () }) { (_, _) =>
                 customButton(
-                    Flex.row(Icon.add(Icon.small), "Add item", gap := "5px"),
+                    Flex.row(Icon.plus(Icon.small), "Add item", gap := "5px"),
                     onClick.mapTo(Event.StartEditingItem) --> eventSink,
                 )
             }

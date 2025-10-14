@@ -2,7 +2,7 @@ import article.{Example1, Example10, Example2, Example3, Example4, Example5, Exa
 import com.raquo.laminar.api.L.{*, given}
 import org.scalajs.dom.document
 import todo.AppComponent
-import common.style.{Flex, card, customOption, customSelect}
+import common.styles.{Flex, card, customOption, customSelect}
 
 
 object App:

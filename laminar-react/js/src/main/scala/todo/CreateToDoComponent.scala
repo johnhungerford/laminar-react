@@ -5,7 +5,7 @@ import org.scalajs.dom
 import org.scalajs.dom.HTMLInputElement
 import todo.model.{AppEvent, ToDo, ToDoList}
 import common.StateContext
-import common.style.{Flex, Icon, customButton, customInput}
+import common.styles.{Flex, Icon, customButton, customInput}
 
 
 /** Create a new to do item for a given list. Displays a prompt button;
@@ -56,7 +56,7 @@ object CreateToDoComponent:
                 .handleCase({ case (State.Initial, _) => () }) { (_, _) =>
                     div(
                         customButton(
-                            Flex.row(gap := "5px", Icon.add(color.white), div("Add todo")),
+                            Flex.row(gap := "5px", Icon.plus(color.white), div("Add todo")),
                             onClick.mapTo(StateEvent.StartAdding) --> localContext.input,
                         ),
                     )
@@ -70,7 +70,6 @@ object CreateToDoComponent:
 
                     val addDisabled = signal.map:
                         case (State.Adding(label, _), Props(_, existingLabels)) =>
-                            dom.console.log(existingLabels)
                             label.strip().isEmpty || existingLabels.contains(label.strip())
 
                     Flex.column(

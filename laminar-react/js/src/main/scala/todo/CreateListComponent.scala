@@ -4,7 +4,7 @@ import com.raquo.laminar.api.L.{*, given}
 import org.scalajs.dom.HTMLInputElement
 import todo.model.AppEvent
 import common.StateContext
-import common.style.{Flex, card, customButton, customInput}
+import common.styles.{Flex, card, customButton, customInput}
 
 
 /** A component to create a new list. Displays a prompt button; when click
