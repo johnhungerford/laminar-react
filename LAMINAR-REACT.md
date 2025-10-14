@@ -7,7 +7,7 @@ Do you have front-end experience using React and some familiarity with Scala? Ar
 
 > Do I need to read the whole thing?
 
-If you are already familiar with Laminar skip to ["Translating React components"](#translating-react-components) or ["Disciplined rendering](#disciplined-rendering) to learn how to translate React patterns into Laminar. Also feel free to just [skip to the code](laminar-react/js/src/main/scala/). See [README.md](README.md) for instructions on running it.
+If you are already familiar with Laminar skip to ["Translating React components"](#translating-react-components) or ["Disciplined rendering"](#disciplined-rendering) to learn how to translate React patterns into Laminar. Also feel free to just [skip to the code](laminar-react/js/src/main/scala/). See [README.md](README.md) for instructions on running it.
 
 ## Background
 
