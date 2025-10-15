@@ -72,28 +72,40 @@ object CreateToDoComponent:
                         case (State.Adding(label, _), Props(_, existingLabels)) =>
                             label.strip().isEmpty || existingLabels.contains(label.strip())
 
-                    Flex.column(
-                        Flex.row(
-                            "Label",
-                            customInput(
-                                value <-- addingSignal.map(_.labelText),
-                                onInput.map(v => StateEvent.SetLabel(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> localContext.input,
+                    form(
+                        onSubmit.preventDefault.mapTo(StateEvent.Add)
+                            --> localContext.input,
+                        Flex.column(
+                            Flex.row(
+                                "Label",
+                                customInput(
+                                    value <-- addingSignal.map(_.labelText),
+                                    onInput.map(v => StateEvent.SetLabel(v.currentTarget.asInstanceOf[HTMLInputElement].value))
+                                        --> localContext.input,
+                                    onMountFocus
+                                ),
+                            ),
+                            Flex.row(
+                                "Details",
+                                customInput(
+                                    value <-- addingSignal.map(_.detailsText),
+                                    onInput.map(v => StateEvent.SetDetails(v.currentTarget.asInstanceOf[HTMLInputElement].value))
+                                        --> localContext.input,
+                                ),
+                            ),
+                            Flex.row(
+                                customButton(
+                                    "Add",
+                                    `type` := "submit",
+                                    disabled <-- addDisabled,
+                                ),
+                                customButton(
+                                    "Cancel",
+                                    `type` := "button",
+                                    onClick.mapTo(StateEvent.StopAdding) --> localContext.input,
+                                ),
                             ),
                         ),
-                        Flex.row(
-                            "Details",
-                            customInput(
-                                value <-- addingSignal.map(_.detailsText),
-                                onInput.map(v => StateEvent.SetDetails(v.currentTarget.asInstanceOf[HTMLInputElement].value)) --> localContext.input,
-                            ),
-                        ),
-                        Flex.row(
-                            customButton("Add", disabled <-- addDisabled, onClick.mapTo(StateEvent.Add) --> localContext.input),
-                            customButton("Cancel", onClick.mapTo(StateEvent.StopAdding) --> localContext.input),
-                        ),
-
-                        // Bind events
-                        onMountFocus,
                     )
                 }
                 .toSignal

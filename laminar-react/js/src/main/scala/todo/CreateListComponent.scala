@@ -66,18 +66,30 @@ object CreateListComponent:
                         stripped.isEmpty || existingNames.contains(stripped)
 
                 card(
-                    Flex.column(
-                        h4("New list"),
-                        customInput(
-                            value <-- addingSignal.map(_.nameText),
-                            onInput.mapToValue.map(StateEvent.SetNameText(_)) --> localContext.input,
-                            onMountFocus,
+                    form(
+                        onSubmit.preventDefault.mapTo(StateEvent.Create) 
+                            --> localContext.input,
+                        Flex.column(
+                            h4("New list"),
+                            customInput(
+                                value <-- addingSignal.map(_.nameText),
+                                onInput.mapToValue.map(StateEvent.SetNameText(_)) --> localContext.input,
+                                onMountFocus,
+                            ),
+                            Flex.row(
+                                customButton(
+                                    "Add",
+                                    `type` := "submit",
+                                    disabled <-- addDisabled,
+                                ),
+                                customButton(
+                                    "Cancel",
+                                    `type` := "button",
+                                    onClick.mapTo(StateEvent.StopCreating) --> localContext.input,
+                                ),
+                            ),
                         ),
-                        Flex.row(
-                            customButton("Add", disabled <-- addDisabled, onClick.mapTo(StateEvent.Create) --> localContext.input),
-                            customButton("Cancel", onClick.mapTo(StateEvent.StopCreating) --> localContext.input),
-                        ),
-                    ),
+                    )
                 )
             }
             .toSignal
