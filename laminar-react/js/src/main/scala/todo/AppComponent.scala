@@ -5,6 +5,7 @@ import com.raquo.laminar.nodes.ReactiveHtmlElement
 import common.styles.Flex
 import todo.model.{AppEvent, AppState, ToDo, ToDoList, ToDoListState}
 import common.StateContext
+import org.scalajs.dom
 
 
 /** Top-level component for To-Do App. Initializes global state and passes
@@ -44,4 +45,9 @@ object AppComponent:
 
             // Bind app events to app state
             appContext.bind,
+
+            // Log all events
+            appContext.events --> { evt =>
+                dom.console.log(evt.toString)
+            }
         )

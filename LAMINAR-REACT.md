@@ -786,7 +786,7 @@ object ConnectedComponent:
     enum Event:
         case ...
 
-    def apply(input: Signal[Props], output: Sink[Event])(using appStore: AppStore): HtmlElement =
+    def apply(input: Signal[Props], output: Sink[Event])(using appContext: AppContext): HtmlElement =
         ???
 ```
 
@@ -797,7 +797,7 @@ For any component to invoke a connected component, it must also be a connected c
 ```scala 3
 object TopLevelComponent:
     def apply(): HtmlElement =
-        given appStore = StateStore[AppState, AppEvent](
+        given appContext = StateContext[AppState, AppEvent](
             AppState(...),
             (state, event) => state.reduce(event),
         )
@@ -832,9 +832,9 @@ object Component:
         def reduce(event: StateEvent): State = ???
 
     // Construct element from inputs, outputs, and global state
-    def apply(in: Signal[Props], out: Sink[Event])(using appStore: AppStore): HtmlElement =
+    def apply(in: Signal[Props], out: Sink[Event])(using appContext: AppContext): HtmlElement =
         // Initialize local state on each render
-        val localState = StateStore(
+        val localState = StateContext(
             State(...), 
             (state, event) => state.reduce(event)
         )
