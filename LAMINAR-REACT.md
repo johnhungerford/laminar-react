@@ -61,7 +61,7 @@ If this all makes sense to you, great. If not, I recommend [taking a look at the
 
 The remainder of this article will try to demonstrate, through a series of examples, how to translate React patterns to Laminar. The approach sketched here is a fairly opinionated one. I strongly recommend it for new users, but there are other perfectly valid ways of structuring Laminar applications. There are some parts of my approach, however, that I would like to call out in advance as non-optional. It will save you a lot of trouble to get used to these three principles early on:
 
-### 1. Data should always much always be reactive
+### 1. Data should always be reactive
 
 In React, we are used to defining our components as functions from properties to DOM elements. In Laminar, components are functions from `Signal`s of properties to DOM elements. This makes things challenging at first, and it can often be tempting to try to skip the reactive types and render elements directly from their static properties. It is possible to do so in many cases, because you can map reactive state to rendered elements and bind them as children to parent nodes as follows:
 
@@ -79,7 +79,7 @@ This distinction between React and Laminar has a number of important consequence
 
 To generalize the above point: get used to thinking about rendering. React encourages you not to think about it. Indeed, this is one of React's main value propositions, that it abstracts from the problem of rendering. The good news is that there are really only a couple of basic patterns dealing with rendering issues that can be learned quickly. We will go over these patterns in some of the examples below. Once you're comfortable with them, you will actually find Laminar to be safer than React since it is much clearer where rendering issues will arise and because you have much more control over rendering.
 
-### 2. Events over callbacks
+### 3. Events over callbacks
 
 In React, we handle events via callbacks, calling functions like `setState` and `dispatch` that may also log and execute any number of other "side-effects." It is possible to use this approach with Laminar, since event props like `onClick` and `onChange` can be bound to callbacks, e.g.:
 
